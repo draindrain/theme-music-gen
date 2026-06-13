@@ -38,10 +38,10 @@ export interface Score {
   loopBars: number;
   tracks: Track[];
   meta: {
-    character: string;
+    subject: string;
     mood: Mood;
     seed: number;
-    /** the leitmotif as scale degrees + onsets/durations in beats: the character's identity */
+    /** the leitmotif as scale degrees + onsets/durations in beats: the subject's identity */
     theme: { degrees: number[]; onsets: number[]; durations: number[] };
   };
 }

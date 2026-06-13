@@ -1,6 +1,6 @@
 /**
- * Leitmotif generation. A character's theme is a fixed 2-bar phrase —
- * scale degrees + rhythm — derived ONLY from character params + seed,
+ * Leitmotif generation. A subject's theme is a fixed 2-bar phrase —
+ * scale degrees + rhythm — derived ONLY from subject params + seed,
  * never from mood. Moods re-color it (mode/tempo/arrangement) but the
  * degree/rhythm sequence is identical across moods: that is the test
  * for "recognizable".

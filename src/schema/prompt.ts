@@ -12,7 +12,7 @@ import {
 const list = (xs: readonly string[]) => xs.map((x) => `"${x}"`).join(" | ");
 
 export function characterPrompt(desc: Description, seed: number): string {
-  return `You are translating a visual-novel character into musical parameters for a
+  return `You are translating a subject into musical parameters for a
 deterministic leitmotif generator. Read the description, then answer with ONE
 JSON object and nothing else. Every field must use exactly one of the allowed
 values; do not invent values, do not add fields, do not add comments.
@@ -23,9 +23,9 @@ CHARACTER
   description: ${desc.description}
 
 Guidance:
-- key.mode sets the character's base color (brightest to darkest:
+- key.mode sets the subject's base color (brightest to darkest:
   lydian > ionian > mixolydian > dorian > aeolian > harmonic_minor > phrygian).
-  Moods will shift around this base, so pick the character's *neutral* self.
+  Moods will shift around this base, so pick the subject's *neutral* self.
 - contour is the melodic shape of their theme; intervals is how it moves
   (stepwise = smooth/lyrical, leapy = bold/angular).
 - rhythm: even = steady, dotted = noble/march-like, syncopated = mischievous,
@@ -60,7 +60,7 @@ Respond with JSON matching exactly:
 }
 
 export function locationPrompt(desc: Description, seed: number): string {
-  return `You are translating a visual-novel location into ambience parameters for a
+  return `You are translating a setting into ambience parameters for a
 procedural sound-design generator. Read the description, then answer with ONE
 JSON object and nothing else. Every field must use exactly one of the allowed
 values; do not invent values, do not add fields, do not add comments.

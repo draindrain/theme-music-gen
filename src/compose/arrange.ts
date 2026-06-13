@@ -1,5 +1,5 @@
 /**
- * Mood arrangement: turn a character's fixed leitmotif into a full Score for
+ * Mood arrangement: turn a subject's fixed leitmotif into a full Score for
  * a given mood. The mood changes mode color, tempo, articulation, harmony and
  * which layers play — never the theme's degree/rhythm sequence.
  */
@@ -282,7 +282,7 @@ export function composeScore(params: CharacterParams, mood: Mood): Score {
     beatsPerBar: BEATS_PER_BAR,
     loopBars: LOOP_BARS,
     tracks,
-    meta: { character: params.id, mood, seed: params.seed, theme: { degrees: theme.degrees, onsets: theme.onsets, durations: theme.durations } },
+    meta: { subject: params.id, mood, seed: params.seed, theme: { degrees: theme.degrees, onsets: theme.onsets, durations: theme.durations } },
   };
 }
 

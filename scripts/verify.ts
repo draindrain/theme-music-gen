@@ -58,7 +58,7 @@ for (const asset of manifest.assets) {
     }
   }
 
-  const name = asset.type === "music" ? `${asset.character}/${asset.mood} (${asset.backend})` : `ambience/${asset.location}`;
+  const name = asset.type === "music" ? `${asset.subject}/${asset.mood} (${asset.backend})` : `ambience/${asset.location}`;
   const ok = problems.length === 0;
   if (!ok) failures++;
   console.log(

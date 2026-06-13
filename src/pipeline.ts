@@ -24,7 +24,7 @@ export const SAMPLE_RATE = 44100;
 
 export interface MusicAsset {
   type: "music";
-  character: string;
+  subject: string;
   mood: Mood;
   backend: string;
   wav: string;
@@ -80,7 +80,7 @@ export async function renderMusicAsset(
 
   const asset: MusicAsset = {
     type: "music",
-    character: params.id,
+    subject: params.id,
     mood,
     backend: backendName,
     wav: result.wavPath,
@@ -141,7 +141,7 @@ export function readManifest(outDir: string): Manifest {
 function updateManifest(outDir: string, asset: Asset): void {
   const m = readManifest(outDir);
   const keyOf = (a: Asset) =>
-    a.type === "music" ? `music/${a.character}/${a.mood}/${a.backend}` : `ambience/${a.location}`;
+    a.type === "music" ? `music/${a.subject}/${a.mood}/${a.backend}` : `ambience/${a.location}`;
   m.assets = m.assets.filter((a) => keyOf(a) !== keyOf(asset));
   m.assets.push(asset);
   m.assets.sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
