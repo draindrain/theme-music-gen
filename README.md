@@ -33,14 +33,18 @@ The included fixtures use a visual novel as the example; they work out of the bo
   from their description. Each *mood* is an arrangement/variation of that same
   theme, so the subject stays recognizable from happy to melancholy. This
   theme-and-variations system is the heart of the tool.
-- **The LLM measures, the code composes — and the LLM lives outside the tool.**
-  Translating a prose description into musical parameters is done by an LLM
-  *you* talk to (see [the params workflow](#the-params-via-chatbot-workflow)).
-  The tool only defines a strict schema, ships the prompt, and validates what
-  you paste back. **All** composition and synthesis is deterministic code.
-- **No network, no API keys at runtime.** The only network access anywhere is
-  `pnpm setup` downloading a soundfont, once. Same seed + same params =
-  byte-identical audio.
+- **The LLM measures, the code composes.** Translating a prose description into
+  musical parameters is the one place an LLM is involved (see
+  [the params workflow](#the-params-via-chatbot-workflow)). The tool defines a
+  strict schema, ships the prompt, and validates the JSON. **All** composition
+  and synthesis is deterministic code. By default the LLM lives *outside* the
+  tool — you paste the prompt into any chatbot — but you can optionally let the
+  tool call Anthropic or Groq directly (still just to produce the params JSON).
+- **Offline and keyless by default.** With the copy-paste workflow the only
+  network access anywhere is `pnpm setup` downloading a soundfont, once. Same
+  seed + same params = byte-identical audio. The optional direct-LLM params path
+  is the single exception — it's opt-in, needs an API key, and only runs when
+  you ask for it.
 - **Music and ambience are separate stems** — mix them at runtime at whatever level suits the project.
 
 ### Pipeline
@@ -74,8 +78,9 @@ the CLI and the audition server add no logic of their own.
 
 | Command | What it does |
 | --- | --- |
-| `pnpm params <desc.json>` | Print the LLM prompt for a subject/setting description. |
-| `pnpm params <desc.json> --ingest <reply.json>` | Validate the LLM's JSON reply and store it as `<desc>.params.json`. Use `--ingest -` to read from stdin. |
+| `pnpm params <desc.json>` | In a terminal, offer a choice: print the prompt to copy-paste, or generate directly via Anthropic/Groq. Piped/non-interactive, it just prints the prompt. |
+| `pnpm params <desc.json> --ingest <reply.json>` | Validate a pasted JSON reply and store it as `<desc>.params.json`. Use `--ingest -` to read from stdin. |
+| `pnpm params <desc.json> --provider <anthropic\|groq> [--model <id>]` | Generate params directly via an LLM. Reads `ANTHROPIC_API_KEY` / `GROQ_API_KEY`, or prompts (hidden) in a terminal. |
 | `pnpm compose <subject.json> --mood <mood> [--backend <name>] [--out <dir>]` | Render one music cue. |
 | `pnpm ambience <setting.json> [--out <dir>]` | Render one ambience bed. |
 | `pnpm batch <assets-dir> [--backend <name>\|all] [--out <dir>]` | Render every subject × every mood, plus every setting. |
@@ -137,7 +142,7 @@ events, …) are the single source of truth in `src/schema/params.ts`.
 
 ## The params-via-chatbot workflow
 
-The tool never calls an LLM. You drive it:
+By default the tool never calls an LLM — you drive it:
 
 1. Write a short description file (see [`fixtures/characters/elara.json`](fixtures/characters/elara.json)):
    ```json
@@ -148,7 +153,8 @@ The tool never calls an LLM. You drive it:
    pnpm params fixtures/characters/elara.json
    ```
    The prompt embeds the description and the entire allowed value space, and asks
-   for a single JSON object.
+   for a single JSON object. (Run in a terminal, this also offers to generate
+   directly — see below.)
 3. Save the chatbot's JSON reply and ingest it — this validates against the
    schema and writes `elara.params.json` next to the description:
    ```bash
@@ -159,6 +165,38 @@ The tool never calls an LLM. You drive it:
 The repo fixtures already ship with authored `*.params.json` files (written with
 this same workflow), so `pnpm batch ./fixtures` works out of the box with **no
 LLM step**.
+
+### Optional: generate params directly
+
+If you'd rather not copy-paste, the tool can call an LLM for you. This is the
+only opt-in network/key use in the project; the validated output is identical
+to the pasted-in path (the Zod schema is still the hard gate, with one automatic
+corrective retry on a bad answer).
+
+```bash
+# Non-interactive: key from env, model from the flag (or the provider default)
+GROQ_API_KEY=…      pnpm params fixtures/characters/elara.json --provider groq --model openai/gpt-oss-120b
+ANTHROPIC_API_KEY=… pnpm params fixtures/characters/elara.json --provider anthropic --model claude-sonnet-4-6
+
+# Interactive: a terminal run with no flags shows a menu (copy-paste / Anthropic
+# / Groq), then a model picker, then prompts for the key (hidden) if no env var.
+pnpm params fixtures/characters/elara.json
+```
+
+The API key is read from `ANTHROPIC_API_KEY` / `GROQ_API_KEY`, or prompted for
+without echoing — it is never written to disk, the params file, or logs.
+
+**Models** (`src/llm/types.ts`, verified June 2026 — Groq drifts, re-check
+[console.groq.com/docs/models](https://console.groq.com/docs/models)):
+
+- **Anthropic** — `claude-sonnet-4-6` (balanced, default), `claude-opus-4-8`
+  (best taste), `claude-haiku-4-5` (cheapest).
+- **Groq** — `openai/gpt-oss-120b` (cheap default, strict JSON),
+  `moonshotai/kimi-k2-instruct-0905` (strongest), `llama-3.3-70b-versatile`,
+  the Llama-4 models, `qwen3-32b`, `openai/gpt-oss-20b`, `llama-3.1-8b-instant`.
+
+Strict-JSON-capable models decode against the schema directly; the rest use
+JSON-object mode plus the schema spelled out in the prompt.
 
 ## The audition page (`pnpm serve`)
 
