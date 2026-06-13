@@ -96,10 +96,10 @@ function render() {
 
   const music = manifest.assets.filter(a => a.type === 'music');
   const ambience = manifest.assets.filter(a => a.type === 'ambience');
-  const characters = [...new Set(music.map(a => a.character))];
+  const characters = [...new Set(music.map(a => a.subject))];
   const usedBackends = [...new Set(music.map(a => a.backend))];
 
-  root.append(el('h2', {}, 'Characters — same theme, every mood, A/B across backends'));
+  root.append(el('h2', {}, 'Subjects — same theme, every mood, A/B across backends'));
   for (const ch of characters) {
     const table = el('table', {});
     table.append(el('tr', {}, el('th', {}, 'mood'),
@@ -107,10 +107,10 @@ function render() {
     for (const mood of moods) {
       const row = el('tr', {}, el('td', {}, mood));
       for (const b of usedBackends) {
-        const asset = music.find(a => a.character === ch && a.mood === mood && a.backend === b);
+        const asset = music.find(a => a.subject === ch && a.mood === mood && a.backend === b);
         row.append(el('td', {}, player(asset)));
       }
-      const anyAsset = music.find(a => a.character === ch && a.mood === mood);
+      const anyAsset = music.find(a => a.subject === ch && a.mood === mood);
       row.append(el('td', {}, anyAsset ? el('a', { href: fileUrl(anyAsset.mid), download: ch + '-' + mood + '.mid' }, '.mid') : '—'));
       table.append(row);
     }

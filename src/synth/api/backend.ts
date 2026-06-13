@@ -52,7 +52,7 @@ export function derivePrompt(score: Score): string {
     `Instrumental video-game background music, ${moodWords[score.meta.mood]}. ` +
     `Key of ${score.key.tonic} ${score.key.mode.replace("_", " ")}, ${score.tempoBpm} BPM, ${score.beatsPerBar}/4. ` +
     `Featuring ${instruments}. ` +
-    `A recurring leitmotif for the character "${score.meta.character}" should carry the piece. ` +
+    `A recurring leitmotif for the subject "${score.meta.subject}" should carry the piece. ` +
     `Seamlessly loopable, no intro or outro, no vocals.`
   );
 }

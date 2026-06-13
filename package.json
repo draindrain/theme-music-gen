@@ -1,7 +1,7 @@
 {
-  "name": "score-vn",
+  "name": "score",
   "version": "0.1.0",
-  "description": "Deterministic leitmotif soundtrack generator for visual novels",
+  "description": "Deterministic leitmotif and ambience generator for games, interactive media, and any project needing looping music from a shared theme",
   "type": "module",
   "private": true,
   "engines": {

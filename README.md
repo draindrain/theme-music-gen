@@ -1,21 +1,37 @@
-# Score — a leitmotif soundtrack generator for visual novels
+# Score — a leitmotif and ambience generator
 
-Generate the entire audio bed for a visual novel from a handful of small JSON
-files: **one looping music track per character per mood**, and **one looping
-ambience track per location**. Run one batch command and get a finished
-soundtrack — WAV + OGG + MIDI for every cue.
+Generate a full set of looping audio cues from a handful of small JSON files:
+**one looping music track per subject per mood**, and **one looping ambience
+track per setting**. Works for games, tabletop RPG session music, interactive
+fiction, podcast backgrounds, audio branding, film scoring tools — run one
+batch command and get a finished soundtrack: WAV + OGG + MIDI for every cue.
 
 ```bash
 pnpm install && pnpm setup && pnpm batch ./fixtures
 pnpm serve            # then open the printed http://localhost:… to audition
 ```
 
+## Use cases
+
+The two primitives — leitmotif tracks and ambience beds — cover a wide range of projects:
+
+| Project type | Subjects | Settings |
+| --- | --- | --- |
+| Visual novel | Characters | Locations |
+| Game OST (any genre) | Factions, bosses, heroes | Biomes, dungeons |
+| Tabletop RPG session | NPCs, factions | Taverns, wilderness, dungeons |
+| Podcast / audio drama | Recurring guests, storylines | Scene changes |
+| Interactive fiction | Protagonists, antagonists | Rooms, acts |
+| Audio branding | Brand voices, product lines | Environments |
+
+The included fixtures use a visual novel as the example; they work out of the box and illustrate the workflow.
+
 ## What it is
 
-- **Leitmotifs, not independent songs.** Each character has a single musical
+- **Leitmotifs, not independent songs.** Each subject has a single musical
   identity — a short melodic theme, key, tempo, instrument palette — derived
   from their description. Each *mood* is an arrangement/variation of that same
-  theme, so the character stays recognizable from happy to melancholy. This
+  theme, so the subject stays recognizable from happy to melancholy. This
   theme-and-variations system is the heart of the tool.
 - **The LLM measures, the code composes — and the LLM lives outside the tool.**
   Translating a prose description into musical parameters is done by an LLM
@@ -25,7 +41,7 @@ pnpm serve            # then open the printed http://localhost:… to audition
 - **No network, no API keys at runtime.** The only network access anywhere is
   `pnpm setup` downloading a soundfont, once. Same seed + same params =
   byte-identical audio.
-- **Music and ambience are separate stems** — the game mixes them at runtime.
+- **Music and ambience are separate stems** — mix them at runtime at whatever level suits the project.
 
 ### Pipeline
 
@@ -58,12 +74,12 @@ the CLI and the audition server add no logic of their own.
 
 | Command | What it does |
 | --- | --- |
-| `pnpm params <desc.json>` | Print the LLM prompt for a character/location description. |
+| `pnpm params <desc.json>` | Print the LLM prompt for a subject/setting description. |
 | `pnpm params <desc.json> --ingest <reply.json>` | Validate the LLM's JSON reply and store it as `<desc>.params.json`. Use `--ingest -` to read from stdin. |
-| `pnpm compose <character.json> --mood <mood> [--backend <name>] [--out <dir>]` | Render one music cue. |
-| `pnpm ambience <location.json> [--out <dir>]` | Render one location ambience bed. |
-| `pnpm batch <assets-dir> [--backend <name>\|all] [--out <dir>]` | Render every character × every mood, plus every location. |
-| `pnpm preview --mix <music.wav> <ambience.wav> [--out <file>]` | Mix a music + ambience pair the way the game would, for a quick listen. |
+| `pnpm compose <subject.json> --mood <mood> [--backend <name>] [--out <dir>]` | Render one music cue. |
+| `pnpm ambience <setting.json> [--out <dir>]` | Render one ambience bed. |
+| `pnpm batch <assets-dir> [--backend <name>\|all] [--out <dir>]` | Render every subject × every mood, plus every setting. |
+| `pnpm preview --mix <music.wav> <ambience.wav> [--out <file>]` | Mix a music + ambience pair for a quick listen. |
 | `pnpm serve [--out <dir>] [--fixtures <dir>] [--port <n>]` | Local audition page (see below). |
 | `pnpm analyze <file.wav> [--key "C ionian"] [--bpm <n>]` | Run the audio analysis harness on any WAV. |
 | `pnpm verify [<out-dir>]` | Re-analyze every asset in a manifest and report pass/fail. |
@@ -81,7 +97,7 @@ in [`src/schema/params.ts`](src/schema/params.ts) — **every field is an enum o
 bounded integer**, so an out-of-range value is a typed error
 (`ParamValidationError`), never a silent pass.
 
-A **character** (drives music):
+A **subject** (drives music):
 
 ```json
 {
@@ -150,7 +166,7 @@ A localhost-only page (no auth, no hosting) that, from the manifest:
 
 - lists every generated asset with an inline audio player;
 - shows the parameter file beside each track;
-- lets you **A/B the same character/mood across backends** side by side;
+- lets you **A/B the same subject/mood across backends** side by side;
 - has a **regenerate** button that re-renders after you edit parameters in the
   browser (validated server-side — invalid edits are rejected, not saved).
 
@@ -237,7 +253,7 @@ src/
   serve/       the audition server + page
   cli/         the CLI surface
   pipeline.ts  params → Score → render → post → files (+ manifest)
-fixtures/      3 characters, 3 locations, with authored *.params.json
+fixtures/      example subjects (visual novel characters) and settings (locations), with authored *.params.json
 scripts/       setup.ts (download soundfont), verify.ts (analyze the manifest)
 test/          vitest suites
 ```

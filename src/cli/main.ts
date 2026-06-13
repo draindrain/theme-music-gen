@@ -2,7 +2,7 @@
 /**
  * Thin CLI over the library. Commands:
  *   params <desc.json> [--ingest <json>|-] [--seed n]
- *   compose <character.json> --mood <mood> [--backend name] [--out dir]
+ *   compose <subject.json> --mood <mood> [--backend name] [--out dir]
  *   ambience <location.json> [--out dir]
  *   batch <assets-dir> [--backend name|all] [--out dir]
  *   preview --mix <music.wav> <ambience.wav> [--out file]
@@ -89,7 +89,7 @@ function loadLocationParams(path: string): LocationParams {
 
 async function cmdParams(args: Args): Promise<void> {
   const [descPath] = args.positional;
-  if (!descPath) fail("usage: params <character.json|location.json> [--ingest <response.json>|-]");
+  if (!descPath) fail("usage: params <subject.json|setting.json> [--ingest <response.json>|-]");
   const desc = parseDescription(readJson(descPath), descPath);
   const outPath = paramsPathFor(descPath);
 
@@ -117,7 +117,7 @@ async function cmdParams(args: Args): Promise<void> {
 
 async function cmdCompose(args: Args): Promise<void> {
   const [charPath] = args.positional;
-  if (!charPath) fail("usage: compose <character.json> --mood <mood> [--backend name] [--out dir]");
+  if (!charPath) fail("usage: compose <subject.json> --mood <mood> [--backend name] [--out dir]");
   const moodRaw = args.flags.get("mood");
   if (typeof moodRaw !== "string") fail(`--mood is required (one of: ${MOODS.join(", ")})`);
   const moodRes = MoodSchema.safeParse(moodRaw);
@@ -275,8 +275,8 @@ async function main(): Promise<void> {
         console.error(
           "usage: score <params|compose|ambience|batch|preview|analyze|serve> ...\n" +
           "  params   <desc.json> [--ingest reply.json|-]   print LLM prompt / validate+store reply\n" +
-          "  compose  <character.json> --mood <mood> [--backend dsp|soundfont|api]\n" +
-          "  ambience <location.json>\n" +
+          "  compose  <subject.json> --mood <mood> [--backend dsp|soundfont|api]\n" +
+          "  ambience <setting.json>\n" +
           "  batch    <assets-dir> [--backend name|all] [--out dir]\n" +
           "  preview  --mix <music.wav> <ambience.wav>\n" +
           "  analyze  <file.wav> [--key 'C ionian'] [--bpm 96]\n" +
