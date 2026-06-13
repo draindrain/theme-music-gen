@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "kind": "character",
+  "id": "elara",
+  "seed": 19087411,
+  "key": { "tonic": "F", "mode": "lydian" },
+  "baseTempo": "slow",
+  "contour": "arch",
+  "intervals": "stepwise",
+  "rhythm": "flowing",
+  "brightness": "bright",
+  "weight": "light",
+  "palette": {
+    "lead": "music_box",
+    "harmony": "harp",
+    "bass": "acoustic_guitar",
+    "pad": "warm_pad"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "kind": "character",
+  "id": "bram",
+  "seed": 73214905,
+  "key": { "tonic": "D", "mode": "aeolian" },
+  "baseTempo": "slow",
+  "contour": "falling",
+  "intervals": "mixed",
+  "rhythm": "dotted",
+  "brightness": "dark",
+  "weight": "medium",
+  "palette": {
+    "lead": "cello",
+    "harmony": "piano",
+    "bass": "cello",
+    "pad": "strings"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "name": "score-vn",
+  "version": "0.1.0",
+  "description": "Deterministic leitmotif soundtrack generator for visual novels",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "setup": "tsx scripts/setup.ts",
+    "params": "tsx src/cli/main.ts params",
+    "compose": "tsx src/cli/main.ts compose",
+    "ambience": "tsx src/cli/main.ts ambience",
+    "batch": "tsx src/cli/main.ts batch",
+    "preview": "tsx src/cli/main.ts preview",
+    "serve": "tsx src/cli/main.ts serve",
+    "analyze": "tsx src/cli/main.ts analyze",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "verify": "tsx scripts/verify.ts"
+  },
+  "dependencies": {
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

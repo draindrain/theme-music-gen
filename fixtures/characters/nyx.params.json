@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "kind": "character",
+  "id": "nyx",
+  "seed": 41652287,
+  "key": { "tonic": "A", "mode": "dorian" },
+  "baseTempo": "fast",
+  "contour": "wave",
+  "intervals": "leapy",
+  "rhythm": "syncopated",
+  "brightness": "neutral",
+  "weight": "medium",
+  "palette": {
+    "lead": "marimba",
+    "harmony": "pluck",
+    "bass": "acoustic_guitar",
+    "pad": "bright_pad"
+  }
+}
