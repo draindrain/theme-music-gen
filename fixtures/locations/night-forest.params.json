@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "kind": "location",
+  "id": "night-forest",
+  "seed": 31337602,
+  "layers": [
+    { "texture": "night_insects", "level": "fg" },
+    { "texture": "wind", "level": "mid" }
+  ],
+  "events": [
+    { "type": "owl", "density": "sparse" },
+    { "type": "frogs", "density": "occasional" },
+    { "type": "crickets_chirp", "density": "occasional" }
+  ],
+  "brightness": "dark",
+  "space": "vast"
+}

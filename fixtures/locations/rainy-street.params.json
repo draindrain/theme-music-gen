@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "kind": "location",
+  "id": "rainy-street",
+  "seed": 90210345,
+  "layers": [
+    { "texture": "rain", "level": "fg" },
+    { "texture": "wind", "level": "bg" }
+  ],
+  "events": [
+    { "type": "droplets", "density": "frequent" },
+    { "type": "distant_thunder", "density": "sparse" }
+  ],
+  "brightness": "dark",
+  "space": "room"
+}

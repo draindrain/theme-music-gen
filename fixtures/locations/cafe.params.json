@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "kind": "location",
+  "id": "cafe",
+  "seed": 55501212,
+  "layers": [
+    { "texture": "crowd_murmur", "level": "fg" },
+    { "texture": "room_tone", "level": "mid" }
+  ],
+  "events": [
+    { "type": "clinks", "density": "frequent" },
+    { "type": "pages", "density": "occasional" }
+  ],
+  "brightness": "bright",
+  "space": "room"
+}
