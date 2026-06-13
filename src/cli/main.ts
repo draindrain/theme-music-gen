@@ -12,12 +12,16 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import process from "node:process";
+import { createInterface } from "node:readline";
+import { pathToFileURL } from "node:url";
 import {
   MOODS, MoodSchema, parseCharacterParams, parseLocationParams, parseDescription,
   ParamValidationError, parseParams,
-  type CharacterParams, type LocationParams, type Mood,
+  type CharacterParams, type LocationParams, type Mood, type Description, type Params,
 } from "../schema/params.ts";
 import { characterPrompt, locationPrompt } from "../schema/prompt.ts";
+import { generateParams } from "../llm/generate.ts";
+import { catalogFor, MODEL_CATALOG } from "../llm/types.ts";
 import { DEFAULT_BACKEND, renderAmbienceAsset, renderMusicAsset } from "../pipeline.ts";
 import { getBackend, listBackends } from "../synth/backend.ts";
 import { decodeWav } from "../audio/wav.ts";
@@ -87,32 +91,145 @@ function loadLocationParams(path: string): LocationParams {
 
 // ---------- commands ----------
 
-async function cmdParams(args: Args): Promise<void> {
-  const [descPath] = args.positional;
-  if (!descPath) fail("usage: params <subject.json|setting.json> [--ingest <response.json>|-]");
-  const desc = parseDescription(readJson(descPath), descPath);
-  const outPath = paramsPathFor(descPath);
+/** elara.json -> deterministic default seed (matches the printed prompt). */
+function seedFor(desc: Description, args: Args): number {
+  const seedFlag = args.flags.get("seed");
+  return typeof seedFlag === "string" ? Number(seedFlag) : hashString(desc.id) % 0xffffffff;
+}
 
-  const ingest = args.flags.get("ingest");
-  if (ingest === undefined) {
-    const seedFlag = args.flags.get("seed");
-    const seed = typeof seedFlag === "string" ? Number(seedFlag) : hashString(desc.id) % 0xffffffff;
-    const prompt = desc.kind === "character" ? characterPrompt(desc, seed) : locationPrompt(desc, seed);
-    console.log(prompt);
-    console.log(`\n--- paste the LLM's JSON reply into a file (or stdin) and run:`);
-    console.log(`    pnpm params ${descPath} --ingest <reply.json>     (or --ingest - for stdin)`);
-    return;
-  }
-
-  const raw =
-    ingest === true || ingest === "-"
-      ? JSON.parse(readFileSync(0, "utf8"))
-      : readJson(String(ingest));
-  const params = parseParams(raw, String(ingest)); // throws ParamValidationError on any out-of-enum value
+/** Validate a raw params object against the schema + description, then write it. */
+function ingestAndWrite(desc: Description, raw: unknown, outPath: string, source: string): Params {
+  const params = parseParams(raw, source); // throws ParamValidationError on any out-of-enum value
   if (params.kind !== desc.kind) fail(`params kind "${params.kind}" does not match description kind "${desc.kind}"`);
   if (params.id !== desc.id) fail(`params id "${params.id}" does not match description id "${desc.id}"`);
   writeFileSync(outPath, JSON.stringify(params, null, 2) + "\n");
-  console.log(`ok: validated and wrote ${outPath}`);
+  return params;
+}
+
+function printPrompt(desc: Description, seed: number, descPath: string): void {
+  const prompt = desc.kind === "character" ? characterPrompt(desc, seed) : locationPrompt(desc, seed);
+  console.log(prompt);
+  console.log(`\n--- paste the LLM's JSON reply into a file (or stdin) and run:`);
+  console.log(`    pnpm params ${descPath} --ingest <reply.json>     (or --ingest - for stdin)`);
+}
+
+export type ParamsMode = "ingest" | "generate" | "prompt" | "menu";
+
+/** Pure decision: how should `params` behave given flags + whether we're interactive? */
+export function chooseParamsMode(o: { hasIngest: boolean; provider?: string | undefined; isTTY: boolean }): ParamsMode {
+  if (o.hasIngest) return "ingest";
+  if (o.provider) return "generate";
+  return o.isTTY ? "menu" : "prompt"; // non-TTY stays backward-compatible: print the prompt
+}
+
+function isInteractive(): boolean {
+  return Boolean(process.stdin.isTTY && process.stdout.isTTY);
+}
+
+/** Ask a question on the terminal; returns the trimmed answer. */
+function ask(query: string): Promise<string> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((res) => rl.question(query, (a) => { rl.close(); res(a.trim()); }));
+}
+
+/** Ask for a secret without echoing keystrokes to the terminal. */
+function askHidden(query: string): Promise<string> {
+  return new Promise((res) => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    // Suppress echo of everything after the query is written.
+    const out = rl as unknown as { _writeToOutput: (s: string) => void };
+    const orig = out._writeToOutput.bind(out);
+    let muted = false;
+    out._writeToOutput = (s: string) => { if (!muted || s.includes("\n")) orig(s); };
+    process.stdout.write(query);
+    muted = true;
+    rl.question("", (a) => { rl.close(); process.stdout.write("\n"); res(a.trim()); });
+  });
+}
+
+/** Resolve an API key from env, else prompt (hidden) if interactive. */
+async function resolveApiKey(provider: string): Promise<string> {
+  const envVar = catalogFor(provider).envVar;
+  const fromEnv = process.env[envVar];
+  if (fromEnv) return fromEnv;
+  if (!isInteractive()) fail(`no API key: set ${envVar} (no TTY to prompt for one)`);
+  const key = await askHidden(`Enter ${provider} API key (${envVar}, not echoed): `);
+  if (!key) fail("no API key entered");
+  return key;
+}
+
+/** Interactive model picker; returns the chosen model id. */
+async function pickModel(provider: string): Promise<string> {
+  const cat = catalogFor(provider);
+  console.log(`\n${provider} models:`);
+  cat.models.forEach((m, i) => {
+    const star = m.id === cat.defaultModel ? " (default)" : "";
+    console.log(`  ${i + 1}. ${m.id}${star} — ${m.note}`);
+  });
+  const a = await ask(`Pick a model [1-${cat.models.length}, Enter for default]: `);
+  if (!a) return cat.defaultModel;
+  const idx = Number(a) - 1;
+  if (!Number.isInteger(idx) || idx < 0 || idx >= cat.models.length) fail(`invalid choice "${a}"`);
+  return cat.models[idx]!.id;
+}
+
+async function runGenerate(
+  desc: Description, seed: number, outPath: string, provider: string, model: string,
+): Promise<void> {
+  const apiKey = await resolveApiKey(provider);
+  console.log(`generating params via ${provider}:${model} …`);
+  const raw = await generateParams({ providerName: provider, model, apiKey, desc, seed });
+  ingestAndWrite(desc, raw, outPath, `${provider}:${model}`);
+  console.log(`ok: generated and wrote ${outPath}`);
+}
+
+async function cmdParams(args: Args): Promise<void> {
+  const [descPath] = args.positional;
+  if (!descPath) fail("usage: params <subject.json|setting.json> [--ingest <reply.json>|-] [--provider anthropic|groq] [--model id]");
+  const desc = parseDescription(readJson(descPath), descPath);
+  const outPath = paramsPathFor(descPath);
+  const seed = seedFor(desc, args);
+
+  const ingest = args.flags.get("ingest");
+  const providerFlag = args.flags.get("provider");
+  const provider = typeof providerFlag === "string" ? providerFlag : undefined;
+  if (provider && !MODEL_CATALOG.some((c) => c.provider === provider))
+    fail(`unknown --provider "${provider}" (one of: ${MODEL_CATALOG.map((c) => c.provider).join(", ")})`);
+
+  const mode = chooseParamsMode({ hasIngest: ingest !== undefined, provider, isTTY: isInteractive() });
+
+  switch (mode) {
+    case "ingest": {
+      const raw = ingest === true || ingest === "-"
+        ? JSON.parse(readFileSync(0, "utf8"))
+        : readJson(String(ingest));
+      ingestAndWrite(desc, raw, outPath, String(ingest));
+      console.log(`ok: validated and wrote ${outPath}`);
+      return;
+    }
+    case "generate": {
+      const modelFlag = args.flags.get("model");
+      const model = typeof modelFlag === "string" ? modelFlag : catalogFor(provider!).defaultModel;
+      await runGenerate(desc, seed, outPath, provider!, model);
+      return;
+    }
+    case "prompt": {
+      printPrompt(desc, seed, descPath);
+      return;
+    }
+    case "menu": {
+      console.log("How would you like to produce params?");
+      console.log("  1. Print the prompt to copy-paste into any chatbot (default)");
+      console.log("  2. Generate directly via Anthropic");
+      console.log("  3. Generate directly via Groq");
+      const choice = (await ask("Choose [1-3, Enter for 1]: ")) || "1";
+      if (choice === "1") { printPrompt(desc, seed, descPath); return; }
+      const chosen = choice === "2" ? "anthropic" : choice === "3" ? "groq" : fail(`invalid choice "${choice}"`);
+      const model = await pickModel(chosen);
+      await runGenerate(desc, seed, outPath, chosen, model);
+      return;
+    }
+  }
 }
 
 async function cmdCompose(args: Args): Promise<void> {
@@ -274,7 +391,7 @@ async function main(): Promise<void> {
       default:
         console.error(
           "usage: score <params|compose|ambience|batch|preview|analyze|serve> ...\n" +
-          "  params   <desc.json> [--ingest reply.json|-]   print LLM prompt / validate+store reply\n" +
+          "  params   <desc.json> [--ingest reply.json|-] [--provider anthropic|groq] [--model id]\n" +
           "  compose  <subject.json> --mood <mood> [--backend dsp|soundfont|api]\n" +
           "  ambience <setting.json>\n" +
           "  batch    <assets-dir> [--backend name|all] [--out dir]\n" +
@@ -293,4 +410,8 @@ async function main(): Promise<void> {
   }
 }
 
-await main();
+// Only run as a CLI entry point — importing this module (e.g. from tests to
+// reuse chooseParamsMode) must not execute the command dispatcher.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
+}

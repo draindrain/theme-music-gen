@@ -20,3 +20,15 @@ export { apiBackend, derivePrompt, registerProvider, getProvider } from "./synth
 export { mockProvider } from "./synth/api/mockProvider.ts";
 export * from "./pipeline.ts";
 export { Rng, hashString } from "./util/prng.ts";
+export {
+  MODEL_CATALOG, catalogFor, modelInfo,
+  registerParamProvider, getParamProvider, listParamProviders,
+  type ParamLlmProvider, type ParamGenRequest, type ParamKind, type ModelInfo, type ProviderCatalog,
+} from "./llm/types.ts";
+export {
+  CharacterParamsLlmSchema, LocationParamsLlmSchema, llmSchemaFor, toJsonSchema,
+} from "./llm/schema.ts";
+export { generateParams, type GenerateParamsOptions } from "./llm/generate.ts";
+export { anthropicProvider } from "./llm/anthropic.ts";
+export { groqProvider } from "./llm/groq.ts";
+export { mockParamProvider } from "./llm/mock.ts";
