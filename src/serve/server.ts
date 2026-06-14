@@ -17,6 +17,8 @@ import {
 } from "../pipeline.ts";
 import {
   MOODS, MoodSchema, parseDescription, parseParams, ParamValidationError,
+  PITCH_CLASSES, MODES, TEMPOS, CONTOURS, INTERVAL_STYLES, RHYTHM_FEELS,
+  INSTRUMENTS, BRIGHTNESS, WEIGHTS,
   type Description, type Mood, type Params,
 } from "../schema/params.ts";
 import { characterPrompt, locationPrompt } from "../schema/prompt.ts";
@@ -110,6 +112,11 @@ export async function startServer(opts: ServeOpts): Promise<import("node:http").
         return json(200, {
           backends, moods: MOODS, models: MODEL_CATALOG,
           formats: FORMATS, haveFfmpeg: haveBinary("ffmpeg"),
+          enums: {
+            pitchClasses: PITCH_CLASSES, modes: MODES, tempos: TEMPOS,
+            contours: CONTOURS, intervalStyles: INTERVAL_STYLES, rhythmFeels: RHYTHM_FEELS,
+            instruments: INSTRUMENTS, brightness: BRIGHTNESS, weights: WEIGHTS,
+          },
         });
       }
 

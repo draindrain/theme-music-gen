@@ -55,6 +55,10 @@ const sessionKeys = {};
 let caps = null;
 let store = null;
 let lastJob = null;
+let variantJob = null;
+let variantMap = null;
+let variantSel = null;
+let variantCtx = null;
 
 function el(tag, attrs, ...children) {
   attrs = attrs || {};
@@ -70,6 +74,39 @@ function el(tag, attrs, ...children) {
   return e;
 }
 function uniq(arr) { return arr.filter((v, i) => arr.indexOf(v) === i); }
+
+// ---------- character param fields (shared by editor + variants) ----------
+// Each entry maps a character param to a dotted path and the enum that supplies
+// its choices. caps.enums is filled from /api/capabilities. 'seed' is special.
+function charFields() {
+  const e = caps.enums;
+  return [
+    { path: 'key.tonic', label: 'tonic', values: e.pitchClasses },
+    { path: 'key.mode', label: 'mode', values: e.modes },
+    { path: 'baseTempo', label: 'tempo', values: e.tempos },
+    { path: 'contour', label: 'contour', values: e.contours },
+    { path: 'intervals', label: 'intervals', values: e.intervalStyles },
+    { path: 'rhythm', label: 'rhythm', values: e.rhythmFeels },
+    { path: 'brightness', label: 'brightness', values: e.brightness },
+    { path: 'weight', label: 'weight', values: e.weights },
+    { path: 'palette.lead', label: 'lead instrument', values: e.instruments },
+    { path: 'palette.harmony', label: 'harmony instrument', values: e.instruments },
+    { path: 'palette.bass', label: 'bass instrument', values: e.instruments },
+    { path: 'palette.pad', label: 'pad instrument', values: e.instruments },
+  ];
+}
+function getPath(obj, path) {
+  let cur = obj;
+  for (const k of path.split('.')) { if (cur == null) return undefined; cur = cur[k]; }
+  return cur;
+}
+function setPath(obj, path, value) {
+  const keys = path.split('.');
+  let cur = obj;
+  for (let i = 0; i < keys.length - 1; i++) cur = cur[keys[i]];
+  cur[keys[keys.length - 1]] = value;
+}
+function clone(obj) { return JSON.parse(JSON.stringify(obj)); }
 
 // ---------- store ----------
 function loadStore() { try { return JSON.parse(localStorage.getItem(LS_KEY)); } catch (e) { return null; } }
@@ -115,7 +152,7 @@ async function setParams(desc, obj) {
 function render() {
   const root = document.getElementById('root');
   root.innerHTML = '';
-  root.append(profileBar(), descriptionsSection(), generateSection(), resultsSection());
+  root.append(profileBar(), descriptionsSection(), generateSection(), variantsSection(), resultsSection());
 }
 
 function profileBar() {
@@ -171,12 +208,73 @@ function paramsOptions(desc) {
   const panel = el('div', { class: 'panel' });
   const show = (node) => { panel.innerHTML = ''; if (node) panel.append(node); };
   return el('div', {},
-    el('div', { class: 'meta' }, 'parameters — pick one:'),
+    el('div', { class: 'meta' }, 'view / edit, or (re)set parameters:'),
     el('div', { class: 'btnrow' },
+      el('button', { onclick: () => show(editPanel(desc)) }, 'Edit'),
       el('button', { class: 'secondary', onclick: () => show(uploadParamsPanel(desc)) }, 'Upload file'),
       el('button', { class: 'secondary', onclick: () => show(promptPanel(desc)) }, 'Copy-paste prompt'),
       el('button', { class: 'secondary', onclick: () => show(generatePanel(desc)) }, 'Generate via API')),
     panel);
+}
+
+// View/edit a character's description and (structured) params. Locations only
+// get the description editor; their params keep the upload/prompt/API flow.
+function editPanel(desc) {
+  const p = profile();
+  const status = el('span', { class: 'status' });
+
+  // --- description ---
+  const name = el('input', { type: 'text', value: desc.name });
+  const prose = el('textarea', {}); prose.value = desc.description;
+  const saveDesc = el('button', { onclick: async () => {
+    const d = { kind: desc.kind, id: desc.id, name: name.value.trim(), description: prose.value.trim() };
+    try {
+      await validate('description', d);
+      p.descriptions[desc.id] = d; saveStore();
+      status.textContent = 'description saved'; status.className = 'status ok';
+    } catch (e) { status.textContent = String(e.message || e); status.className = 'status err'; }
+  } }, 'Save description');
+
+  const wrap = el('div', {},
+    el('div', { class: 'meta' }, 'id ' + desc.id + ' · ' + desc.kind + ' (id and kind are fixed)'),
+    el('h3', {}, 'Description'),
+    el('div', { class: 'btnrow' }, el('strong', {}, 'Name:'), name),
+    prose,
+    el('div', { class: 'btnrow' }, saveDesc));
+
+  // --- params (characters only) ---
+  if (desc.kind === 'character') {
+    const params = p.params[desc.id];
+    if (!params) {
+      wrap.append(el('h3', {}, 'Parameters'),
+        el('div', { class: 'meta' }, 'No params yet — set them with Upload / Copy-paste prompt / Generate via API.'));
+    } else {
+      const seed = el('input', { type: 'number', min: '0', max: String(0xffffffff), value: String(params.seed) });
+      const controls = {};
+      const grid = el('div', { class: 'grid4' });
+      grid.append(el('div', {}, el('div', { class: 'meta' }, 'seed'), seed));
+      for (const f of charFields()) {
+        const sel = selectInput(f.values, getPath(params, f.path));
+        controls[f.path] = sel;
+        grid.append(el('div', {}, el('div', { class: 'meta' }, f.label), sel));
+      }
+      const saveParams = el('button', { onclick: async () => {
+        const obj = clone(params);
+        const s = parseInt(seed.value, 10);
+        if (!Number.isFinite(s) || s < 0 || s > 0xffffffff) {
+          status.textContent = 'seed must be 0..4294967295'; status.className = 'status err'; return;
+        }
+        obj.seed = s;
+        for (const f of charFields()) setPath(obj, f.path, controls[f.path].value);
+        try { await setParams(desc, obj); render(); }
+        catch (e) { status.textContent = String(e.message || e); status.className = 'status err'; }
+      } }, 'Save parameters');
+      wrap.append(el('h3', {}, 'Parameters'), grid, el('div', { class: 'btnrow' }, saveParams));
+    }
+  }
+
+  wrap.append(el('div', { class: 'btnrow' }, status));
+  return wrap;
 }
 
 function uploadParamsPanel(desc) {
@@ -274,12 +372,24 @@ function addDescriptionForm() {
     el('div', { class: 'btnrow' }, add, el('span', { class: 'meta' }, 'or import:'), file, status));
 }
 
-function checklist(values, isChecked, isDisabled, labelOf) {
+function selectInput(values, current, onchange) {
+  const sel = el('select', onchange ? { onchange } : {});
+  for (const v of values) {
+    const o = el('option', { value: v }, v);
+    if (v === current) o.setAttribute('selected', '');
+    sel.append(o);
+  }
+  if (current != null) sel.value = current;
+  return sel;
+}
+
+function checklist(values, isChecked, isDisabled, labelOf, onChange) {
   const boxes = {};
   const list = el('div', { class: 'checks' });
   for (const v of values) {
     const cb = el('input', { type: 'checkbox' });
     cb.checked = isChecked(v); cb.disabled = isDisabled(v);
+    if (onChange) cb.onchange = () => onChange();
     boxes[v] = cb;
     list.append(el('label', { class: 'chk' + (isDisabled(v) ? ' dim' : '') }, cb, ' ' + labelOf(v)));
   }
@@ -298,10 +408,21 @@ function generateSection() {
     (id) => !p.params[id],
     (id) => p.descriptions[id].name + ' (' + p.descriptions[id].kind + ')' + (p.params[id] ? '' : ' — no params'));
 
+  // Persist checkbox settings to localStorage on every toggle, so selections
+  // stick across reloads without needing to click Generate.
+  function persist() {
+    cfg.formats = caps.formats.filter(f => fmt.boxes[f].checked);
+    cfg.backends = beNames.filter(n => be.boxes[n].checked);
+    const m = caps.moods.filter(x => mood.boxes[x].checked);
+    cfg.moods = m.length === caps.moods.length ? [] : m;
+    saveStore();
+  }
+
   const fmt = checklist(caps.formats,
     (f) => f === 'wav' ? true : (cfg.formats.indexOf(f) >= 0 && !(f === 'ogg' && !caps.haveFfmpeg)),
     (f) => f === 'wav' || (f === 'ogg' && !caps.haveFfmpeg),
-    (f) => f + (f === 'ogg' && !caps.haveFfmpeg ? ' (needs ffmpeg)' : '') + (f === 'wav' ? ' (always)' : ''));
+    (f) => f + (f === 'ogg' && !caps.haveFfmpeg ? ' (needs ffmpeg)' : '') + (f === 'wav' ? ' (always)' : ''),
+    persist);
 
   const beNames = caps.backends.map(b => b.name);
   const beOk = {}; for (const b of caps.backends) beOk[b.name] = b.ok;
@@ -309,13 +430,15 @@ function generateSection() {
   const be = checklist(beNames,
     (n) => beOk[n] && cfg.backends.indexOf(n) >= 0,
     (n) => !beOk[n],
-    (n) => n + (beOk[n] ? '' : ' — ' + beReason[n]));
+    (n) => n + (beOk[n] ? '' : ' — ' + beReason[n]),
+    persist);
 
   const allMoods = cfg.moods.length === 0;
   const mood = checklist(caps.moods,
     (m) => allMoods || cfg.moods.indexOf(m) >= 0,
     () => false,
-    (m) => m);
+    (m) => m,
+    persist);
 
   const status = el('span', { class: 'status' });
   const go = el('button', { onclick: async () => {
@@ -352,10 +475,143 @@ function generateSection() {
   return wrap;
 }
 
-function fileUrl(p) { return '/file?job=' + encodeURIComponent(lastJob.job) + '&path=' + encodeURIComponent(p); }
-function player(asset) {
+// ---------- variants ----------
+// Fix a character + mood and vary one input — the seed (a random batch) or one
+// parameter (one render per possible value) — then pick a winner whose value is
+// written back to the character. Built entirely on /api/generate by giving each
+// variant a distinct synthetic id so renders don't collide.
+function variantsSection() {
+  const wrap = el('div', {});
+  wrap.append(el('h2', {}, 'Variants'));
+  wrap.append(el('p', { class: 'meta' }, 'Most single melodies are hit or miss — generate a batch over the seed or one parameter, audition them, and keep the best.'));
+  const p = profile();
+  const charIds = Object.keys(p.descriptions).filter(id => p.descriptions[id].kind === 'character' && p.params[id]);
+  if (charIds.length === 0) {
+    wrap.append(el('p', { class: 'meta' }, 'Add a character with parameters first.'));
+    return wrap;
+  }
+  if (!variantSel) variantSel = {};
+  if (charIds.indexOf(variantSel.char) < 0) variantSel.char = charIds[0];
+
+  const okBackends = caps.backends.filter(b => b.ok).map(b => b.name);
+  if (okBackends.indexOf(variantSel.synth) < 0) variantSel.synth = okBackends[0];
+  if (caps.moods.indexOf(variantSel.mood) < 0) variantSel.mood = caps.moods[0];
+
+  const charSel = selectInput(charIds, variantSel.char, (e) => { variantSel.char = e.target.value; });
+  const moodSel = selectInput(caps.moods, variantSel.mood, (e) => { variantSel.mood = e.target.value; });
+  const synthSel = okBackends.length
+    ? selectInput(okBackends, variantSel.synth, (e) => { variantSel.synth = e.target.value; })
+    : el('span', { class: 'err' }, 'no synth available');
+
+  // Vary select: 'seed' plus each character param field (value = path).
+  const fields = charFields();
+  if (variantSel.vary == null) variantSel.vary = 'seed';
+  const varySel = el('select', { onchange: (e) => { variantSel.vary = e.target.value; render(); } });
+  const seedOpt = el('option', { value: 'seed' }, 'seed (random batch)');
+  if (variantSel.vary === 'seed') seedOpt.setAttribute('selected', '');
+  varySel.append(seedOpt);
+  for (const f of fields) {
+    const o = el('option', { value: f.path }, f.label);
+    if (variantSel.vary === f.path) o.setAttribute('selected', '');
+    varySel.append(o);
+  }
+  varySel.value = variantSel.vary;
+
+  const count = el('input', { type: 'number', min: '1', max: '50', value: String(variantSel.count || 20) });
+  count.oninput = () => { variantSel.count = parseInt(count.value, 10) || 20; };
+  const countWrap = el('div', {}, el('div', { class: 'meta' }, 'count'), count);
+  if (variantSel.vary !== 'seed') countWrap.style.display = 'none';
+
+  const status = el('span', { class: 'status' });
+  const go = el('button', { onclick: async () => {
+    const baseDesc = p.descriptions[variantSel.char];
+    const baseParams = p.params[variantSel.char];
+    if (!okBackends.length) { status.textContent = 'no synth available'; status.className = 'status err'; return; }
+
+    // Build the list of varied values and matching items with distinct ids.
+    const field = variantSel.vary === 'seed' ? null : fields.find(f => f.path === variantSel.vary);
+    let values;
+    if (field) values = field.values.slice();
+    else {
+      const n = Math.max(1, Math.min(50, parseInt(count.value, 10) || 20));
+      values = [];
+      for (let i = 0; i < n; i++) values.push(Math.floor(Math.random() * 0xffffffff));
+    }
+    const items = [], map = {};
+    values.forEach((val, i) => {
+      const vid = baseDesc.id + '-var-' + String(i).padStart(2, '0');
+      const d = clone(baseDesc); d.id = vid;
+      const pr = clone(baseParams); pr.id = vid;
+      if (field) setPath(pr, field.path, val); else pr.seed = val;
+      items.push({ description: d, params: pr });
+      map[vid] = { label: field ? String(val) : ('seed ' + val), value: val };
+    });
+
+    go.disabled = true; status.textContent = 'generating ' + items.length + ' variants… this can take a while'; status.className = 'status';
+    try {
+      const res = await fetch('/api/generate', { method: 'POST', body: JSON.stringify({
+        items, formats: ['wav'], backends: [variantSel.synth], moods: [variantSel.mood] }) });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error);
+      variantJob = j; variantMap = map;
+      variantCtx = { baseId: baseDesc.id, mood: variantSel.mood, path: field ? field.path : null };
+      render();
+      const r = document.getElementById('variant-results'); if (r) r.scrollIntoView({ behavior: 'smooth' });
+    } catch (e) { status.textContent = String(e.message || e); status.className = 'status err'; go.disabled = false; }
+  } }, 'Generate variants');
+
+  wrap.append(
+    el('div', { class: 'grid4' },
+      el('div', {}, el('h3', {}, 'Character'), charSel),
+      el('div', {}, el('h3', {}, 'Mood'), moodSel),
+      el('div', {}, el('h3', {}, 'Synth'), synthSel),
+      el('div', {}, el('h3', {}, 'Vary'), varySel, countWrap)),
+    el('div', { class: 'btnrow' }, go, status),
+    variantResults());
+  return wrap;
+}
+
+function variantResults() {
+  const wrap = el('div', { id: 'variant-results' });
+  if (!variantJob || !variantMap || !variantCtx) return wrap;
+  const music = variantJob.manifest.assets.filter(a => a.type === 'music');
+  if (music.length === 0) { wrap.append(el('p', { class: 'meta' }, 'No variants rendered.')); return wrap; }
+  // Order results to match the generated value order (synthetic ids sort).
+  music.sort((a, b) => a.subject.localeCompare(b.subject));
+  const p = profile();
+  const baseId = variantCtx.baseId;
+  const desc = p.descriptions[baseId];
+  const path = variantCtx.path;
+  if (!desc) { wrap.append(el('p', { class: 'meta' }, 'Original character was removed.')); return wrap; }
+
+  wrap.append(el('h3', {}, 'Variants for ' + baseId + ' · ' + variantCtx.mood +
+    ' · varying ' + (path || 'seed')));
+  const table = el('table', {});
+  table.append(el('tr', {}, el('th', {}, 'value'), el('th', {}, 'preview'), el('th', {}, '')));
+  for (const a of music) {
+    const info = variantMap[a.subject];
+    if (!info) continue;
+    const use = el('button', { onclick: async () => {
+      const cur = p.params[baseId];
+      if (!cur) { window.alert('Character no longer has params'); return; }
+      const obj = clone(cur);
+      if (path) setPath(obj, path, info.value); else obj.seed = info.value;
+      try { await setParams(desc, obj); render(); }
+      catch (e) { window.alert(String(e.message || e)); }
+    } }, 'Use this');
+    table.append(el('tr', {},
+      el('td', {}, el('strong', {}, info.label)),
+      el('td', {}, player(variantJob, a)),
+      el('td', {}, use)));
+  }
+  wrap.append(el('div', { class: 'entity' }, table));
+  return wrap;
+}
+
+function fileUrl(job, p) { return '/file?job=' + encodeURIComponent(job.job) + '&path=' + encodeURIComponent(p); }
+function player(job, asset) {
   if (!asset) return el('span', { class: 'meta' }, '—');
-  const a = el('audio', { controls: '', loop: '', preload: 'none', src: fileUrl(asset.wav) });
+  const a = el('audio', { controls: '', loop: '', preload: 'none', src: fileUrl(job, asset.wav) });
   return el('div', {}, a, el('div', { class: 'meta' },
     asset.seconds.toFixed(1) + 's · rms ' + asset.rmsDb.toFixed(1) + 'dB' +
     (asset.key ? ' · ' + asset.key + ' · ' + asset.tempoBpm + 'bpm' : '')));
@@ -384,17 +640,17 @@ function resultsSection() {
       const row = el('tr', {}, el('td', {}, m));
       for (const b of usedBackends) {
         const asset = music.find(a => a.subject === ch && a.mood === m && a.backend === b);
-        row.append(el('td', {}, player(asset)));
+        row.append(el('td', {}, player(lastJob, asset)));
       }
       const withMid = music.find(a => a.subject === ch && a.mood === m && a.mid);
-      row.append(el('td', {}, withMid ? el('a', { href: fileUrl(withMid.mid), download: ch + '-' + m + '.mid' }, '.mid') : '—'));
+      row.append(el('td', {}, withMid ? el('a', { href: fileUrl(lastJob, withMid.mid), download: ch + '-' + m + '.mid' }, '.mid') : '—'));
       table.append(row);
     }
     wrap.append(el('div', { class: 'entity' }, el('h3', {}, ch), table));
   }
   if (ambience.length) {
     wrap.append(el('h2', {}, 'Ambience'));
-    for (const a of ambience) wrap.append(el('div', { class: 'entity' }, el('h3', {}, a.location), player(a)));
+    for (const a of ambience) wrap.append(el('div', { class: 'entity' }, el('h3', {}, a.location), player(lastJob, a)));
   }
   return wrap;
 }
