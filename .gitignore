@@ -1,5 +1,6 @@
 node_modules/
 out/
+jobs/
 vendor/
 *.log
 preview.wav
