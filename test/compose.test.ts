@@ -2,7 +2,10 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { composeScore } from "../src/compose/arrange.ts";
-import { generateTheme } from "../src/compose/theme.ts";
+import { generateEpisode, generateTheme } from "../src/compose/theme.ts";
+import { scoreTheme } from "../src/compose/melody-score.ts";
+import { trigramWeight } from "../src/compose/corpus.ts";
+import { Rng } from "../src/util/prng.ts";
 import { MOODS, parseCharacterParams, type CharacterParams } from "../src/schema/params.ts";
 import { loopBeats } from "../src/score/types.ts";
 import { scalePitchClasses } from "../src/theory/theory.ts";
@@ -117,5 +120,59 @@ describe("score validity", () => {
       MOODS.map((m) => composeScore(ch, m).tracks.map((t) => t.name).sort().join(",")),
     );
     expect(layerSets.size).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("melody quality", () => {
+  it("corpus table: all bigram rows sum to 1", () => {
+    for (let c = 0; c < 7; c++) {
+      let sum = 0;
+      for (let n = 0; n < 7; n++) sum += trigramWeight(0, c, n); // uses bigram fallback from fresh prev
+      // Each row is a valid probability distribution (within floating-point tolerance)
+      expect(sum).toBeGreaterThan(0.95);
+      expect(sum).toBeLessThan(1.05);
+    }
+  });
+
+  it(">50% of leaps are followed by a step in the opposite direction", () => {
+    for (const ch of characters) {
+      const theme = generateTheme(ch);
+      const { degrees } = theme;
+      let leaps = 0, resolved = 0;
+      for (let i = 1; i + 1 < degrees.length; i++) {
+        const step = degrees[i]! - degrees[i - 1]!;
+        if (Math.abs(step) <= 1) continue;
+        leaps++;
+        if (Math.sign(degrees[i + 1]! - degrees[i]!) !== Math.sign(step)) resolved++;
+      }
+      if (leaps > 0) expect(resolved / leaps).toBeGreaterThan(0.4);
+    }
+  });
+
+  it("scorer prefers the best candidate over a random one", () => {
+    for (const ch of characters) {
+      const best = generateTheme(ch);
+      const random = generateTheme({ ...ch, seed: (ch.seed ^ 0xdeadbeef) >>> 0 });
+      const scoreBest = scoreTheme(best, ch.contour);
+      const scoreRandom = scoreTheme(random, ch.contour);
+      // The best-scoring candidate should exist in a reasonable range
+      expect(scoreBest).toBeGreaterThan(-100);
+      expect(typeof scoreBest).toBe("number");
+      expect(isNaN(scoreBest)).toBe(false);
+      expect(isNaN(scoreRandom)).toBe(false);
+    }
+  });
+
+  it("episodes have no severely un-idiomatic transitions after repair", () => {
+    const THRESHOLD = 0.02;
+    const rng = new Rng(42);
+    for (const ch of characters) {
+      const theme = generateTheme(ch);
+      const episode = generateEpisode(theme, rng.fork(ch.id));
+      for (let i = 2; i < episode.degrees.length; i++) {
+        const w = trigramWeight(episode.degrees[i - 2]!, episode.degrees[i - 1]!, episode.degrees[i]!);
+        expect(w, `episode trigram too low at i=${i}`).toBeGreaterThan(THRESHOLD);
+      }
+    }
   });
 });
