@@ -118,17 +118,18 @@ export class MissingToolError extends Error {
 }
 
 export function haveBinary(name: string): boolean {
-  try {
-    execFileSync(name, ["-version"], { stdio: "ignore" });
-    return true;
-  } catch {
+  for (const flag of ["-version", "--version"]) {
     try {
-      execFileSync(name, ["--version"], { stdio: "ignore" });
+      execFileSync(name, [flag], { stdio: "ignore" });
       return true;
-    } catch {
-      return false;
+    } catch (e: unknown) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "EACCES") return false;
+      // Binary exists but exited non-zero — that's fine, it ran.
+      return true;
     }
   }
+  return false;
 }
 
 export function writeWav(buf: AudioBuf, path: string): void {
@@ -137,7 +138,7 @@ export function writeWav(buf: AudioBuf, path: string): void {
 
 export function encodeOgg(wavPath: string, oggPath: string): void {
   if (!haveBinary("ffmpeg"))
-    throw new MissingToolError("ffmpeg", "Install it (e.g. `apt install ffmpeg` / `brew install ffmpeg`) to get OGG output.");
+    throw new MissingToolError("ffmpeg", "Install it (e.g. `apt install ffmpeg` / `brew install ffmpeg` / `winget install Gyan.FFmpeg`) to get OGG output.");
   execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", wavPath, "-c:a", "libvorbis", "-q:a", "5", oggPath], { stdio: "inherit" });
 }
 

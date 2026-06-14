@@ -63,8 +63,15 @@ description.json  ──(you + any LLM)──▶  params.json   (strict, enum-on
 
 - **Node 22+** and **pnpm**.
 - **fluidsynth** — for the default `soundfont` backend. (`apt install fluidsynth`
-  / `brew install fluid-synth`)
-- **ffmpeg** — for OGG encoding. (`apt install ffmpeg` / `brew install ffmpeg`)
+  / `brew install fluid-synth` / `scoop install fluidsynth`)
+- **ffmpeg** — for OGG encoding. (`apt install ffmpeg` / `brew install ffmpeg`
+  / `winget install Gyan.FFmpeg`)
+
+**Windows:** [Scoop](https://scoop.sh) covers both in one command:
+```powershell
+scoop install ffmpeg fluidsynth
+```
+Open a new terminal afterwards so the updated PATH reaches `pnpm setup`.
 
 `pnpm setup` checks for these, downloads the GeneralUser GS soundfont into
 `vendor/`, and tells you exactly what to install if anything is missing. The

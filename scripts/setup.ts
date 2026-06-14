@@ -23,7 +23,12 @@ function have(bin: string): boolean {
     try {
       execFileSync(bin, [flag], { stdio: "ignore" });
       return true;
-    } catch { /* try next flag */ }
+    } catch (e: unknown) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "EACCES") return false;
+      // Binary exists but exited non-zero — that's fine, it ran.
+      return true;
+    }
   }
   return false;
 }
@@ -37,8 +42,8 @@ function check(name: string, ok: boolean, hint: string): void {
 
 const major = Number(process.versions.node.split(".")[0]);
 check("node >= 22", major >= 22, "install Node 22+ (https://nodejs.org)");
-check("ffmpeg (OGG encoding)", have("ffmpeg"), "apt install ffmpeg | brew install ffmpeg");
-check("fluidsynth (soundfont backend)", have("fluidsynth"), "apt install fluidsynth | brew install fluid-synth");
+check("ffmpeg (OGG encoding)", have("ffmpeg"), "apt install ffmpeg | brew install ffmpeg | winget install Gyan.FFmpeg");
+check("fluidsynth (soundfont backend)", have("fluidsynth"), "apt install fluidsynth | brew install fluid-synth | scoop install fluidsynth");
 
 if (existsSync(SF2_PATH) && statSync(SF2_PATH).size > MIN_SF2_BYTES) {
   console.log(`  ok   soundfont at ${SF2_PATH} (${(statSync(SF2_PATH).size / 1e6).toFixed(1)} MB)`);
