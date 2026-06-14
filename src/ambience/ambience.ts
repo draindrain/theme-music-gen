@@ -5,7 +5,13 @@
  * not notes), then run through the same loop/normalize post chain as music.
  */
 import { createBuf, type AudioBuf } from "../audio/buffer.ts";
-import type { LocationParams, Texture, AmbEventType, Density, LayerLevel } from "../schema/params.ts";
+import type {
+  LocationParams,
+  Texture,
+  AmbEventType,
+  Density,
+  LayerLevel,
+} from "../schema/params.ts";
 import { schroederReverb } from "../synth/dsp/render.ts";
 import { Rng } from "../util/prng.ts";
 
@@ -26,7 +32,13 @@ export function renderAmbience(params: LocationParams, sampleRate = 44100): Audi
   const brightTilt = params.brightness === "bright" ? 1.5 : params.brightness === "dark" ? 0.55 : 1;
 
   for (const layer of params.layers) {
-    renderTexture(buf, layer.texture, LEVEL_GAIN[layer.level], brightTilt, rng.fork(`tex:${layer.texture}`));
+    renderTexture(
+      buf,
+      layer.texture,
+      LEVEL_GAIN[layer.level],
+      brightTilt,
+      rng.fork(`tex:${layer.texture}`),
+    );
   }
   for (const ev of params.events) {
     scatterEvents(buf, loopN, ev.type, ev.density, rng.fork(`ev:${ev.type}`));
@@ -37,7 +49,9 @@ export function renderAmbience(params: LocationParams, sampleRate = 44100): Audi
   const rev = schroederReverb(buf, wet, params.space === "vast" ? 0.86 : 0.78);
   const out = createBuf(sr, total);
   for (let c = 0; c < 2; c++) {
-    const o = out.channels[c]!, d = buf.channels[c]!, w = rev.channels[c]!;
+    const o = out.channels[c]!,
+      d = buf.channels[c]!,
+      w = rev.channels[c]!;
     for (let i = 0; i < total; i++) o[i] = d[i]! + w[i]!;
   }
   // gentle fade-from-zero attack on the very first 30ms so the wrapped seam is clean
@@ -55,7 +69,13 @@ export function ambienceLoopSamples(sampleRate = 44100): number {
 
 // ---------- textures ----------
 
-function renderTexture(buf: AudioBuf, texture: Texture, gain: number, brightTilt: number, rng: Rng): void {
+function renderTexture(
+  buf: AudioBuf,
+  texture: Texture,
+  gain: number,
+  brightTilt: number,
+  rng: Rng,
+): void {
   const sr = buf.sampleRate;
   const n = buf.channels[0].length;
   for (let c = 0; c < 2; c++) {
@@ -64,7 +84,8 @@ function renderTexture(buf: AudioBuf, texture: Texture, gain: number, brightTilt
     switch (texture) {
       case "rain": {
         // dense filtered noise + slow level undulation
-        let lp = 0, lp2 = 0;
+        let lp = 0,
+          lp2 = 0;
         const cut = 0.12 * brightTilt;
         for (let i = 0; i < n; i++) {
           const w = chRng.next() * 2 - 1;
@@ -77,14 +98,19 @@ function renderTexture(buf: AudioBuf, texture: Texture, gain: number, brightTilt
       }
       case "wind": {
         // band-limited noise with wandering cutoff (gusts)
-        let lp = 0, gust = 0.04, gustT = 0;
+        let lp = 0,
+          gust = 0.04,
+          gustT = 0;
         for (let i = 0; i < n; i++) {
           if (--gustT <= 0) {
             gustT = Math.floor(sr * chRng.range(1.5, 4));
             gust = chRng.range(0.015, 0.09) * brightTilt;
           }
           const w = chRng.next() * 2 - 1;
-          const coeff = Math.min(0.2, Math.max(0.004, gust + 0.02 * Math.sin((2 * Math.PI * 0.13 * i) / sr)));
+          const coeff = Math.min(
+            0.2,
+            Math.max(0.004, gust + 0.02 * Math.sin((2 * Math.PI * 0.13 * i) / sr)),
+          );
           lp += coeff * (w - lp);
           x[i]! += lp * 1.1 * gain;
         }
@@ -93,10 +119,13 @@ function renderTexture(buf: AudioBuf, texture: Texture, gain: number, brightTilt
       case "crowd_murmur": {
         // many slow band-passed noise "voices"
         for (let v = 0; v < 8; v++) {
-          let bp = 0, bp2 = 0;
+          let bp = 0,
+            bp2 = 0;
           const f = (2 * Math.PI * chRng.range(180, 700)) / sr;
           const vRng = chRng.fork(`v${v}`);
-          let lvl = 0, lvlT = 0, lvlTarget = 0;
+          let lvl = 0,
+            lvlT = 0,
+            lvlTarget = 0;
           for (let i = 0; i < n; i++) {
             if (--lvlT <= 0) {
               lvlT = Math.floor(sr * vRng.range(0.2, 1.4));
@@ -113,7 +142,8 @@ function renderTexture(buf: AudioBuf, texture: Texture, gain: number, brightTilt
       }
       case "night_insects": {
         // continuous cricket-band shimmer: AM-modulated high band noise
-        let bp = 0, bp2 = 0;
+        let bp = 0,
+          bp2 = 0;
         const f = (2 * Math.PI * 4200 * Math.min(1.3, brightTilt)) / sr;
         for (let i = 0; i < n; i++) {
           const w = chRng.next() * 2 - 1;
@@ -126,13 +156,21 @@ function renderTexture(buf: AudioBuf, texture: Texture, gain: number, brightTilt
         break;
       }
       case "water_stream": {
-        let lp = 0, lp2 = 0, lp3 = 0;
+        let lp = 0,
+          lp2 = 0,
+          lp3 = 0;
         for (let i = 0; i < n; i++) {
           const w = chRng.next() * 2 - 1;
           lp += 0.3 * brightTilt * (w - lp);
           lp2 += 0.07 * (lp - lp2);
           lp3 += 0.012 * (lp2 - lp3);
-          const burble = 0.7 + 0.3 * Math.sin((2 * Math.PI * (0.9 + 0.2 * c) * i) / sr + Math.sin((2 * Math.PI * 0.23 * i) / sr) * 3);
+          const burble =
+            0.7 +
+            0.3 *
+              Math.sin(
+                (2 * Math.PI * (0.9 + 0.2 * c) * i) / sr +
+                  Math.sin((2 * Math.PI * 0.23 * i) / sr) * 3,
+              );
           x[i]! += (lp - lp2 + lp3 * 2) * 0.35 * gain * burble;
         }
         break;
@@ -163,7 +201,8 @@ function renderTexture(buf: AudioBuf, texture: Texture, gain: number, brightTilt
       }
       case "seaside": {
         // wave swells: slow-enveloped broadband noise
-        let lp = 0, lp2 = 0;
+        let lp = 0,
+          lp2 = 0;
         for (let i = 0; i < n; i++) {
           const w = chRng.next() * 2 - 1;
           lp += 0.09 * brightTilt * (w - lp);
@@ -180,7 +219,8 @@ function renderTexture(buf: AudioBuf, texture: Texture, gain: number, brightTilt
           const w = chRng.next() * 2 - 1;
           lp += 0.015 * (w - lp);
           const t = i / sr;
-          const drone = 0.02 * Math.sin(2 * Math.PI * 60 * t) + 0.012 * Math.sin(2 * Math.PI * 89 * t + c);
+          const drone =
+            0.02 * Math.sin(2 * Math.PI * 60 * t) + 0.012 * Math.sin(2 * Math.PI * 89 * t + c);
           const surge = 0.75 + 0.25 * Math.sin(2 * Math.PI * 0.05 * t + c * 2);
           x[i]! += (lp * 1.4 + drone) * surge * gain;
         }
@@ -192,7 +232,13 @@ function renderTexture(buf: AudioBuf, texture: Texture, gain: number, brightTilt
 
 // ---------- events ----------
 
-function scatterEvents(buf: AudioBuf, loopN: number, type: AmbEventType, density: Density, rng: Rng): void {
+function scatterEvents(
+  buf: AudioBuf,
+  loopN: number,
+  type: AmbEventType,
+  density: Density,
+  rng: Rng,
+): void {
   const sr = buf.sampleRate;
   const perMin = DENSITY_PER_MIN[density];
   const count = Math.max(1, Math.round((perMin * (loopN / sr)) / 60));
@@ -213,28 +259,47 @@ function scatterEvents(buf: AudioBuf, loopN: number, type: AmbEventType, density
 
 function renderEvent(type: AmbEventType, sr: number, rng: Rng): Float32Array {
   switch (type) {
-    case "droplets": return decayedTone(sr, rng.range(900, 2600), 0.12, 0.4, rng, { chirp: -0.3 });
-    case "clinks": return decayedTone(sr, rng.range(1800, 3400), 0.18, 0.3, rng, { metallic: true });
-    case "birds": return birdChirp(sr, rng);
-    case "owl": return owlHoot(sr, rng);
-    case "frogs": return frogCroak(sr, rng);
-    case "creaks": return creak(sr, rng);
-    case "chimes": return decayedTone(sr, rng.pick([523.25, 659.25, 783.99, 1046.5]), 1.6, 0.22, rng, { metallic: true });
-    case "distant_thunder": return thunder(sr, rng);
-    case "footsteps": return thud(sr, rng, rng.range(80, 140), 0.09, 0.5);
-    case "pages": return noiseSwish(sr, rng, 0.22, 0.18);
-    case "crickets_chirp": return cricketBurst(sr, rng);
-    case "gull": return gullCry(sr, rng);
+    case "droplets":
+      return decayedTone(sr, rng.range(900, 2600), 0.12, 0.4, rng, { chirp: -0.3 });
+    case "clinks":
+      return decayedTone(sr, rng.range(1800, 3400), 0.18, 0.3, rng, { metallic: true });
+    case "birds":
+      return birdChirp(sr, rng);
+    case "owl":
+      return owlHoot(sr, rng);
+    case "frogs":
+      return frogCroak(sr, rng);
+    case "creaks":
+      return creak(sr, rng);
+    case "chimes":
+      return decayedTone(sr, rng.pick([523.25, 659.25, 783.99, 1046.5]), 1.6, 0.22, rng, {
+        metallic: true,
+      });
+    case "distant_thunder":
+      return thunder(sr, rng);
+    case "footsteps":
+      return thud(sr, rng, rng.range(80, 140), 0.09, 0.5);
+    case "pages":
+      return noiseSwish(sr, rng, 0.22, 0.18);
+    case "crickets_chirp":
+      return cricketBurst(sr, rng);
+    case "gull":
+      return gullCry(sr, rng);
   }
 }
 
 function decayedTone(
-  sr: number, freq: number, durSec: number, amp: number, rng: Rng,
+  sr: number,
+  freq: number,
+  durSec: number,
+  amp: number,
+  rng: Rng,
   opts: { chirp?: number; metallic?: boolean } = {},
 ): Float32Array {
   const n = Math.floor(durSec * sr);
   const out = new Float32Array(n);
-  let phase = 0, phase2 = 0;
+  let phase = 0,
+    phase2 = 0;
   for (let i = 0; i < n; i++) {
     const t = i / sr;
     const f = freq * Math.pow(2, (opts.chirp ?? 0) * t);
@@ -318,7 +383,8 @@ function creak(sr: number, rng: Rng): Float32Array {
 function thunder(sr: number, rng: Rng): Float32Array {
   const n = Math.floor(rng.range(2.2, 3.5) * sr);
   const out = new Float32Array(n);
-  let lp = 0, lp2 = 0;
+  let lp = 0,
+    lp2 = 0;
   for (let i = 0; i < n; i++) {
     const t = i / sr;
     const w = rng.next() * 2 - 1;
@@ -382,7 +448,10 @@ function gullCry(sr: number, rng: Rng): Float32Array {
     const f = f0 * (1 + 0.25 * Math.sin(Math.PI * t)) * (1 - 0.15 * t);
     phase += f / sr;
     const env = Math.sin(Math.PI * t) ** 1.3;
-    out[i] = (Math.sin(2 * Math.PI * phase) * 0.8 + 0.2 * Math.sin(4 * Math.PI * phase + 0.5)) * env * 0.17;
+    out[i] =
+      (Math.sin(2 * Math.PI * phase) * 0.8 + 0.2 * Math.sin(4 * Math.PI * phase + 0.5)) *
+      env *
+      0.17;
   }
   return out;
 }

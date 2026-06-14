@@ -7,7 +7,10 @@ export interface AudioBuf {
 }
 
 export function createBuf(sampleRate: number, lengthSamples: number): AudioBuf {
-  return { sampleRate, channels: [new Float32Array(lengthSamples), new Float32Array(lengthSamples)] };
+  return {
+    sampleRate,
+    channels: [new Float32Array(lengthSamples), new Float32Array(lengthSamples)],
+  };
 }
 
 export function bufLength(buf: AudioBuf): number {

@@ -15,14 +15,14 @@ pnpm serve            # web studio: build, generate, audition & download in the 
 
 The two primitives — leitmotif tracks and ambience beds — cover a wide range of projects:
 
-| Project type | Subjects | Settings |
-| --- | --- | --- |
-| Visual novel | Characters | Locations |
-| Game OST (any genre) | Factions, bosses, heroes | Biomes, dungeons |
-| Tabletop RPG session | NPCs, factions | Taverns, wilderness, dungeons |
-| Podcast / audio drama | Recurring guests, storylines | Scene changes |
-| Interactive fiction | Protagonists, antagonists | Rooms, acts |
-| Audio branding | Brand voices, product lines | Environments |
+| Project type          | Subjects                     | Settings                      |
+| --------------------- | ---------------------------- | ----------------------------- |
+| Visual novel          | Characters                   | Locations                     |
+| Game OST (any genre)  | Factions, bosses, heroes     | Biomes, dungeons              |
+| Tabletop RPG session  | NPCs, factions               | Taverns, wilderness, dungeons |
+| Podcast / audio drama | Recurring guests, storylines | Scene changes                 |
+| Interactive fiction   | Protagonists, antagonists    | Rooms, acts                   |
+| Audio branding        | Brand voices, product lines  | Environments                  |
 
 The included fixtures use a visual novel as the example; they work out of the box and illustrate the workflow.
 
@@ -30,14 +30,14 @@ The included fixtures use a visual novel as the example; they work out of the bo
 
 - **Leitmotifs, not independent songs.** Each subject has a single musical
   identity — a short melodic theme, key, tempo, instrument palette — derived
-  from their description. Each *mood* is an arrangement/variation of that same
+  from their description. Each _mood_ is an arrangement/variation of that same
   theme, so the subject stays recognizable from happy to melancholy. This
   theme-and-variations system is the heart of the tool.
 - **The LLM measures, the code composes.** Translating a prose description into
   musical parameters is the one place an LLM is involved (see
   [the params workflow](#the-params-via-chatbot-workflow)). The tool defines a
   strict schema, ships the prompt, and validates the JSON. **All** composition
-  and synthesis is deterministic code. By default the LLM lives *outside* the
+  and synthesis is deterministic code. By default the LLM lives _outside_ the
   tool — you paste the prompt into any chatbot — but you can optionally let the
   tool call Anthropic or Groq directly (still just to produce the params JSON).
 - **Offline and keyless by default.** With the copy-paste workflow the only
@@ -70,33 +70,35 @@ description.json  ──(you + any LLM)──▶  params.json   (strict, enum-on
   `apt install zip` / `brew install zip`.)
 
 **Windows:** [Scoop](https://scoop.sh) covers both in one command:
+
 ```powershell
 scoop install ffmpeg fluidsynth
 ```
+
 Open a new terminal afterwards so the updated PATH reaches `pnpm setup`.
 
 `pnpm setup` checks for these, downloads the GeneralUser GS soundfont into
 `vendor/`, and tells you exactly what to install if anything is missing. The
 pure-TypeScript `dsp` backend works with zero external tools, so you can always
-generate *something* even before setup.
+generate _something_ even before setup.
 
 ## Commands
 
 All commands are thin wrappers over the importable library (`src/index.ts`);
 the CLI and the audition server add no logic of their own.
 
-| Command | What it does |
-| --- | --- |
-| `pnpm params <desc.json>` | In a terminal, offer a choice: print the prompt to copy-paste, or generate directly via Anthropic/Groq. Piped/non-interactive, it just prints the prompt. |
-| `pnpm params <desc.json> --ingest <reply.json>` | Validate a pasted JSON reply and store it as `<desc>.params.json`. Use `--ingest -` to read from stdin. |
-| `pnpm params <desc.json> --provider <anthropic\|groq> [--model <id>]` | Generate params directly via an LLM. Reads `ANTHROPIC_API_KEY` / `GROQ_API_KEY`, or prompts (hidden) in a terminal. |
-| `pnpm compose <subject.json> --mood <mood> [--backend <name>] [--out <dir>]` | Render one music cue. |
-| `pnpm ambience <setting.json> [--out <dir>]` | Render one ambience bed. |
-| `pnpm batch <assets-dir> [--backend <name>\|all] [--out <dir>]` | Render every subject × every mood, plus every setting. |
-| `pnpm preview --mix <music.wav> <ambience.wav> [--out <file>]` | Mix a music + ambience pair for a quick listen. |
-| `pnpm serve [--fixtures <dir>] [--jobs <dir>] [--port <n>]` | Web studio: run the whole pipeline from the browser (see below). |
-| `pnpm analyze <file.wav> [--key "C ionian"] [--bpm <n>]` | Run the audio analysis harness on any WAV. |
-| `pnpm verify [<out-dir>]` | Re-analyze every asset in a manifest and report pass/fail. |
+| Command                                                                      | What it does                                                                                                                                              |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm params <desc.json>`                                                    | In a terminal, offer a choice: print the prompt to copy-paste, or generate directly via Anthropic/Groq. Piped/non-interactive, it just prints the prompt. |
+| `pnpm params <desc.json> --ingest <reply.json>`                              | Validate a pasted JSON reply and store it as `<desc>.params.json`. Use `--ingest -` to read from stdin.                                                   |
+| `pnpm params <desc.json> --provider <anthropic\|groq> [--model <id>]`        | Generate params directly via an LLM. Reads `ANTHROPIC_API_KEY` / `GROQ_API_KEY`, or prompts (hidden) in a terminal.                                       |
+| `pnpm compose <subject.json> --mood <mood> [--backend <name>] [--out <dir>]` | Render one music cue.                                                                                                                                     |
+| `pnpm ambience <setting.json> [--out <dir>]`                                 | Render one ambience bed.                                                                                                                                  |
+| `pnpm batch <assets-dir> [--backend <name>\|all] [--out <dir>]`              | Render every subject × every mood, plus every setting.                                                                                                    |
+| `pnpm preview --mix <music.wav> <ambience.wav> [--out <file>]`               | Mix a music + ambience pair for a quick listen.                                                                                                           |
+| `pnpm serve [--fixtures <dir>] [--jobs <dir>] [--port <n>]`                  | Web studio: run the whole pipeline from the browser (see below).                                                                                          |
+| `pnpm analyze <file.wav> [--key "C ionian"] [--bpm <n>]`                     | Run the audio analysis harness on any WAV.                                                                                                                |
+| `pnpm verify [<out-dir>]`                                                    | Re-analyze every asset in a manifest and report pass/fail.                                                                                                |
 
 - **Moods:** `happy`, `sad`, `tense`, `tender`, `playful`, `melancholy`.
 - **Backends:** `dsp`, `soundfont` (default), `api`. `--backend all` renders all
@@ -126,7 +128,12 @@ A **subject** (drives music):
   "rhythm": "flowing",
   "brightness": "bright",
   "weight": "light",
-  "palette": { "lead": "music_box", "harmony": "harp", "bass": "acoustic_guitar", "pad": "warm_pad" }
+  "palette": {
+    "lead": "music_box",
+    "harmony": "harp",
+    "bass": "acoustic_guitar",
+    "pad": "warm_pad"
+  }
 }
 ```
 
@@ -138,8 +145,14 @@ A **location** (drives ambience):
   "kind": "location",
   "id": "night-forest",
   "seed": 31337602,
-  "layers": [ { "texture": "night_insects", "level": "fg" }, { "texture": "wind", "level": "mid" } ],
-  "events": [ { "type": "owl", "density": "sparse" }, { "type": "frogs", "density": "occasional" } ],
+  "layers": [
+    { "texture": "night_insects", "level": "fg" },
+    { "texture": "wind", "level": "mid" }
+  ],
+  "events": [
+    { "type": "owl", "density": "sparse" },
+    { "type": "frogs", "density": "occasional" }
+  ],
   "brightness": "dark",
   "space": "vast"
 }
@@ -155,7 +168,12 @@ By default the tool never calls an LLM — you drive it:
 
 1. Write a short description file (see [`fixtures/characters/elara.json`](fixtures/characters/elara.json)):
    ```json
-   { "kind": "character", "id": "elara", "name": "Elara", "description": "A gentle apprentice librarian…" }
+   {
+     "kind": "character",
+     "id": "elara",
+     "name": "Elara",
+     "description": "A gentle apprentice librarian…"
+   }
    ```
 2. Print the prompt and paste it into **any** chatbot:
    ```bash
@@ -246,7 +264,7 @@ loop at target loudness, WAV + OGG) regardless of backend.
 - **`dsp`** — pure from-scratch synthesis (oscillators, FM, Karplus–Strong,
   envelopes, a one-pole filter, a Schroeder reverb) → PCM → WAV. Zero external
   dependencies; always available; used in tests.
-- **`soundfont`** *(default)* — renders the Score's MIDI through `fluidsynth`
+- **`soundfont`** _(default)_ — renders the Score's MIDI through `fluidsynth`
   with the GeneralUser GS soundfont.
 - **`api`** — derives a text prompt from the same parameters and sends it to a
   pluggable hosted music-generation provider. v1 ships only a deterministic

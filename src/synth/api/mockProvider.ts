@@ -35,7 +35,10 @@ export const mockProvider: MusicProvider = {
         let s = 0;
         for (const p of partials) {
           const g = c === 0 ? 1 - Math.max(0, p.pan) : 1 + Math.min(0, p.pan);
-          s += Math.sin(2 * Math.PI * root * p.ratio * t) * p.amp * g *
+          s +=
+            Math.sin(2 * Math.PI * root * p.ratio * t) *
+            p.amp *
+            g *
             (0.6 + 0.4 * Math.sin(2 * Math.PI * p.lfo * t + p.ratio));
         }
         const w = chRng.next() * 2 - 1;

@@ -42,8 +42,16 @@ function check(name: string, ok: boolean, hint: string): void {
 
 const major = Number(process.versions.node.split(".")[0]);
 check("node >= 22", major >= 22, "install Node 22+ (https://nodejs.org)");
-check("ffmpeg (OGG encoding)", have("ffmpeg"), "apt install ffmpeg | brew install ffmpeg | winget install Gyan.FFmpeg");
-check("fluidsynth (soundfont backend)", have("fluidsynth"), "apt install fluidsynth | brew install fluid-synth | scoop install fluidsynth");
+check(
+  "ffmpeg (OGG encoding)",
+  have("ffmpeg"),
+  "apt install ffmpeg | brew install ffmpeg | winget install Gyan.FFmpeg",
+);
+check(
+  "fluidsynth (soundfont backend)",
+  have("fluidsynth"),
+  "apt install fluidsynth | brew install fluid-synth | scoop install fluidsynth",
+);
 
 if (existsSync(SF2_PATH) && statSync(SF2_PATH).size > MIN_SF2_BYTES) {
   console.log(`  ok   soundfont at ${SF2_PATH} (${(statSync(SF2_PATH).size / 1e6).toFixed(1)} MB)`);
@@ -53,7 +61,8 @@ if (existsSync(SF2_PATH) && statSync(SF2_PATH).size > MIN_SF2_BYTES) {
     const res = await fetch(SF2_URL, { redirect: "follow" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const bytes = Buffer.from(await res.arrayBuffer());
-    if (bytes.length < MIN_SF2_BYTES) throw new Error(`file too small (${bytes.length} bytes) — download corrupted?`);
+    if (bytes.length < MIN_SF2_BYTES)
+      throw new Error(`file too small (${bytes.length} bytes) — download corrupted?`);
     mkdirSync(dirname(SF2_PATH), { recursive: true });
     writeFileSync(SF2_PATH, bytes);
     writeFileSync(
@@ -63,7 +72,9 @@ if (existsSync(SF2_PATH) && statSync(SF2_PATH).size > MIN_SF2_BYTES) {
         "games) and redistribution of the bank. Full text:\n" +
         "https://github.com/mrbumpy409/GeneralUser-GS/blob/main/LICENSE.txt\n",
     );
-    console.log(`  ok   downloaded ${(bytes.length / 1e6).toFixed(1)} MB (GeneralUser GS License v2.0 — game redistribution permitted)`);
+    console.log(
+      `  ok   downloaded ${(bytes.length / 1e6).toFixed(1)} MB (GeneralUser GS License v2.0 — game redistribution permitted)`,
+    );
   } catch (e) {
     console.log(`MISSING  soundfont download failed: ${(e as Error).message}`);
     console.log(`         -> download manually from ${SF2_URL} and save as ${SF2_PATH}`);
@@ -72,7 +83,9 @@ if (existsSync(SF2_PATH) && statSync(SF2_PATH).size > MIN_SF2_BYTES) {
 }
 
 if (failures > 0) {
-  console.error(`\nsetup incomplete (${failures} issue${failures > 1 ? "s" : ""}). The pure-TS "dsp" backend works regardless; fix the above for soundfont/OGG.`);
+  console.error(
+    `\nsetup incomplete (${failures} issue${failures > 1 ? "s" : ""}). The pure-TS "dsp" backend works regardless; fix the above for soundfont/OGG.`,
+  );
   process.exit(1);
 }
 console.log("\nsetup complete. Try: pnpm batch ./fixtures");

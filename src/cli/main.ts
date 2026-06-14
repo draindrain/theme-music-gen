@@ -15,26 +15,42 @@ import process from "node:process";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import {
-  MOODS, MoodSchema, parseCharacterParams, parseLocationParams, parseDescription,
-  ParamValidationError, parseParams,
-  type CharacterParams, type LocationParams, type Mood, type Description, type Params,
+  MOODS,
+  MoodSchema,
+  parseCharacterParams,
+  parseLocationParams,
+  parseDescription,
+  ParamValidationError,
+  parseParams,
+  type CharacterParams,
+  type LocationParams,
+  type Description,
+  type Params,
 } from "../schema/params.ts";
 import { characterPrompt, locationPrompt } from "../schema/prompt.ts";
 import { generateParams } from "../llm/generate.ts";
 import { catalogFor, MODEL_CATALOG } from "../llm/types.ts";
 import {
-  DEFAULT_BACKEND, renderAmbienceAsset, renderMusicAsset, renderSet,
-  RenderRequestError, type RenderItem,
+  DEFAULT_BACKEND,
+  renderAmbienceAsset,
+  renderMusicAsset,
+  renderSet,
+  RenderRequestError,
+  type RenderItem,
 } from "../pipeline.ts";
 import { getBackend, listBackends } from "../synth/backend.ts";
 import { decodeWav } from "../audio/wav.ts";
 import { createBuf, bufLength } from "../audio/buffer.ts";
 import { normalizeLoudness, writeWav, rmsDb, peakDb } from "../post/post.ts";
 import {
-  detectTempo, inKeyEnergyRatio, loopSeamReport, isEffectivelySilent, tempoMatches,
+  detectTempo,
+  inKeyEnergyRatio,
+  loopSeamReport,
+  isEffectivelySilent,
+  tempoMatches,
 } from "../analysis/analyze.ts";
 import { PITCH_CLASSES, MODES, type PitchClass, type Mode } from "../schema/params.ts";
-import { hashString } from "../util/prng.ts";
+import { defaultSeed } from "../util/prng.ts";
 import { startServer } from "../serve/server.ts";
 
 interface Args {
@@ -81,14 +97,18 @@ function paramsPathFor(descPath: string): string {
 function loadCharacterParams(path: string): CharacterParams {
   const p = path.endsWith(".params.json") ? path : paramsPathFor(path);
   if (!existsSync(p))
-    fail(`no parameter file at ${p}. Run \`pnpm params ${path}\` and paste the prompt into your LLM first.`);
+    fail(
+      `no parameter file at ${p}. Run \`pnpm params ${path}\` and paste the prompt into your LLM first.`,
+    );
   return parseCharacterParams(readJson(p), p);
 }
 
 function loadLocationParams(path: string): LocationParams {
   const p = path.endsWith(".params.json") ? path : paramsPathFor(path);
   if (!existsSync(p))
-    fail(`no parameter file at ${p}. Run \`pnpm params ${path}\` and paste the prompt into your LLM first.`);
+    fail(
+      `no parameter file at ${p}. Run \`pnpm params ${path}\` and paste the prompt into your LLM first.`,
+    );
   return parseLocationParams(readJson(p), p);
 }
 
@@ -97,20 +117,23 @@ function loadLocationParams(path: string): LocationParams {
 /** elara.json -> deterministic default seed (matches the printed prompt). */
 function seedFor(desc: Description, args: Args): number {
   const seedFlag = args.flags.get("seed");
-  return typeof seedFlag === "string" ? Number(seedFlag) : hashString(desc.id) % 0xffffffff;
+  return typeof seedFlag === "string" ? Number(seedFlag) : defaultSeed(desc.id);
 }
 
 /** Validate a raw params object against the schema + description, then write it. */
 function ingestAndWrite(desc: Description, raw: unknown, outPath: string, source: string): Params {
   const params = parseParams(raw, source); // throws ParamValidationError on any out-of-enum value
-  if (params.kind !== desc.kind) fail(`params kind "${params.kind}" does not match description kind "${desc.kind}"`);
-  if (params.id !== desc.id) fail(`params id "${params.id}" does not match description id "${desc.id}"`);
+  if (params.kind !== desc.kind)
+    fail(`params kind "${params.kind}" does not match description kind "${desc.kind}"`);
+  if (params.id !== desc.id)
+    fail(`params id "${params.id}" does not match description id "${desc.id}"`);
   writeFileSync(outPath, JSON.stringify(params, null, 2) + "\n");
   return params;
 }
 
 function printPrompt(desc: Description, seed: number, descPath: string): void {
-  const prompt = desc.kind === "character" ? characterPrompt(desc, seed) : locationPrompt(desc, seed);
+  const prompt =
+    desc.kind === "character" ? characterPrompt(desc, seed) : locationPrompt(desc, seed);
   console.log(prompt);
   console.log(`\n--- paste the LLM's JSON reply into a file (or stdin) and run:`);
   console.log(`    pnpm params ${descPath} --ingest <reply.json>     (or --ingest - for stdin)`);
@@ -119,7 +142,11 @@ function printPrompt(desc: Description, seed: number, descPath: string): void {
 export type ParamsMode = "ingest" | "generate" | "prompt" | "menu";
 
 /** Pure decision: how should `params` behave given flags + whether we're interactive? */
-export function chooseParamsMode(o: { hasIngest: boolean; provider?: string | undefined; isTTY: boolean }): ParamsMode {
+export function chooseParamsMode(o: {
+  hasIngest: boolean;
+  provider?: string | undefined;
+  isTTY: boolean;
+}): ParamsMode {
   if (o.hasIngest) return "ingest";
   if (o.provider) return "generate";
   return o.isTTY ? "menu" : "prompt"; // non-TTY stays backward-compatible: print the prompt
@@ -132,7 +159,12 @@ function isInteractive(): boolean {
 /** Ask a question on the terminal; returns the trimmed answer. */
 function ask(query: string): Promise<string> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((res) => rl.question(query, (a) => { rl.close(); res(a.trim()); }));
+  return new Promise((res) =>
+    rl.question(query, (a) => {
+      rl.close();
+      res(a.trim());
+    }),
+  );
 }
 
 /** Ask for a secret without echoing keystrokes to the terminal. */
@@ -143,10 +175,16 @@ function askHidden(query: string): Promise<string> {
     const out = rl as unknown as { _writeToOutput: (s: string) => void };
     const orig = out._writeToOutput.bind(out);
     let muted = false;
-    out._writeToOutput = (s: string) => { if (!muted || s.includes("\n")) orig(s); };
+    out._writeToOutput = (s: string) => {
+      if (!muted || s.includes("\n")) orig(s);
+    };
     process.stdout.write(query);
     muted = true;
-    rl.question("", (a) => { rl.close(); process.stdout.write("\n"); res(a.trim()); });
+    rl.question("", (a) => {
+      rl.close();
+      process.stdout.write("\n");
+      res(a.trim());
+    });
   });
 }
 
@@ -177,7 +215,11 @@ async function pickModel(provider: string): Promise<string> {
 }
 
 async function runGenerate(
-  desc: Description, seed: number, outPath: string, provider: string, model: string,
+  desc: Description,
+  seed: number,
+  outPath: string,
+  provider: string,
+  model: string,
 ): Promise<void> {
   const apiKey = await resolveApiKey(provider);
   console.log(`generating params via ${provider}:${model} …`);
@@ -188,7 +230,10 @@ async function runGenerate(
 
 async function cmdParams(args: Args): Promise<void> {
   const [descPath] = args.positional;
-  if (!descPath) fail("usage: params <subject.json|setting.json> [--ingest <reply.json>|-] [--provider anthropic|groq] [--model id]");
+  if (!descPath)
+    fail(
+      "usage: params <subject.json|setting.json> [--ingest <reply.json>|-] [--provider anthropic|groq] [--model id]",
+    );
   const desc = parseDescription(readJson(descPath), descPath);
   const outPath = paramsPathFor(descPath);
   const seed = seedFor(desc, args);
@@ -197,15 +242,22 @@ async function cmdParams(args: Args): Promise<void> {
   const providerFlag = args.flags.get("provider");
   const provider = typeof providerFlag === "string" ? providerFlag : undefined;
   if (provider && !MODEL_CATALOG.some((c) => c.provider === provider))
-    fail(`unknown --provider "${provider}" (one of: ${MODEL_CATALOG.map((c) => c.provider).join(", ")})`);
+    fail(
+      `unknown --provider "${provider}" (one of: ${MODEL_CATALOG.map((c) => c.provider).join(", ")})`,
+    );
 
-  const mode = chooseParamsMode({ hasIngest: ingest !== undefined, provider, isTTY: isInteractive() });
+  const mode = chooseParamsMode({
+    hasIngest: ingest !== undefined,
+    provider,
+    isTTY: isInteractive(),
+  });
 
   switch (mode) {
     case "ingest": {
-      const raw = ingest === true || ingest === "-"
-        ? JSON.parse(readFileSync(0, "utf8"))
-        : readJson(String(ingest));
+      const raw =
+        ingest === true || ingest === "-"
+          ? JSON.parse(readFileSync(0, "utf8"))
+          : readJson(String(ingest));
       ingestAndWrite(desc, raw, outPath, String(ingest));
       console.log(`ok: validated and wrote ${outPath}`);
       return;
@@ -226,8 +278,12 @@ async function cmdParams(args: Args): Promise<void> {
       console.log("  2. Generate directly via Anthropic");
       console.log("  3. Generate directly via Groq");
       const choice = (await ask("Choose [1-3, Enter for 1]: ")) || "1";
-      if (choice === "1") { printPrompt(desc, seed, descPath); return; }
-      const chosen = choice === "2" ? "anthropic" : choice === "3" ? "groq" : fail(`invalid choice "${choice}"`);
+      if (choice === "1") {
+        printPrompt(desc, seed, descPath);
+        return;
+      }
+      const chosen =
+        choice === "2" ? "anthropic" : choice === "3" ? "groq" : fail(`invalid choice "${choice}"`);
       const model = await pickModel(chosen);
       await runGenerate(desc, seed, outPath, chosen, model);
       return;
@@ -249,7 +305,9 @@ async function cmdCompose(args: Args): Promise<void> {
   console.log(`ok: ${asset.wav}`);
   console.log(`    ${asset.ogg}`);
   console.log(`    ${asset.mid}`);
-  console.log(`    key=${asset.key} bpm=${asset.tempoBpm} loop=${asset.seconds.toFixed(2)}s rms=${asset.rmsDb.toFixed(1)}dB`);
+  console.log(
+    `    key=${asset.key} bpm=${asset.tempoBpm} loop=${asset.seconds.toFixed(2)}s rms=${asset.rmsDb.toFixed(1)}dB`,
+  );
 }
 
 async function cmdAmbience(args: Args): Promise<void> {
@@ -304,8 +362,14 @@ async function cmdBatch(args: Args): Promise<void> {
   // Build description+params items, then hand off to the shared core render loop
   // (the same one the web `/api/generate` route uses).
   const items: RenderItem[] = [
-    ...characters.map((p) => ({ description: parseDescription(readJson(p), p), params: loadCharacterParams(p) })),
-    ...locations.map((p) => ({ description: parseDescription(readJson(p), p), params: loadLocationParams(p) })),
+    ...characters.map((p) => ({
+      description: parseDescription(readJson(p), p),
+      params: loadCharacterParams(p),
+    })),
+    ...locations.map((p) => ({
+      description: parseDescription(readJson(p), p),
+      params: loadLocationParams(p),
+    })),
   ];
 
   const t0 = Date.now();
@@ -317,12 +381,18 @@ async function cmdBatch(args: Args): Promise<void> {
       onProgress: (asset) => {
         count++;
         if (asset.type === "music")
-          console.log(`[${count}] music    ${asset.subject}/${asset.mood} (${asset.backend})  ${asset.seconds.toFixed(1)}s  rms ${asset.rmsDb.toFixed(1)}dB`);
+          console.log(
+            `[${count}] music    ${asset.subject}/${asset.mood} (${asset.backend})  ${asset.seconds.toFixed(1)}s  rms ${asset.rmsDb.toFixed(1)}dB`,
+          );
         else
-          console.log(`[${count}] ambience ${asset.location}  ${asset.seconds.toFixed(1)}s  rms ${asset.rmsDb.toFixed(1)}dB`);
+          console.log(
+            `[${count}] ambience ${asset.location}  ${asset.seconds.toFixed(1)}s  rms ${asset.rmsDb.toFixed(1)}dB`,
+          );
       },
     });
-    console.log(`\ndone: ${manifest.assets.length} assets in ${((Date.now() - t0) / 1000).toFixed(1)}s -> ${resolve(outDir)}`);
+    console.log(
+      `\ndone: ${manifest.assets.length} assets in ${((Date.now() - t0) / 1000).toFixed(1)}s -> ${resolve(outDir)}`,
+    );
   } catch (e) {
     if (e instanceof RenderRequestError) fail(e.message);
     throw e;
@@ -331,7 +401,8 @@ async function cmdBatch(args: Args): Promise<void> {
 
 async function cmdPreview(args: Args): Promise<void> {
   const mix = args.flags.get("mix");
-  if (mix === undefined) fail("usage: preview --mix <music.wav> <ambience.wav> [--out preview.wav]");
+  if (mix === undefined)
+    fail("usage: preview --mix <music.wav> <ambience.wav> [--out preview.wav]");
   // --mix consumes the next arg as its value; the rest are positional
   const files = [typeof mix === "string" ? mix : null, ...args.positional].filter(
     (f): f is string => f !== null,
@@ -345,9 +416,10 @@ async function cmdPreview(args: Args): Promise<void> {
   const out = createBuf(music.sampleRate, n);
   const ambGain = 0.5; // game-style: ambience sits ~6 dB under the music
   for (let c = 0; c < 2; c++) {
-    const o = out.channels[c]!, m = music.channels[c]!, a = amb.channels[c]!;
-    for (let i = 0; i < n; i++)
-      o[i] = m[i % m.length]! + a[i % a.length]! * ambGain; // both loop to fill
+    const o = out.channels[c]!,
+      m = music.channels[c]!,
+      a = amb.channels[c]!;
+    for (let i = 0; i < n; i++) o[i] = m[i % m.length]! + a[i % a.length]! * ambGain; // both loop to fill
   }
   const outPath = String(args.flags.get("out") ?? "preview.wav");
   writeWav(normalizeLoudness(out), outPath);
@@ -363,7 +435,9 @@ async function cmdAnalyze(args: Args): Promise<void> {
   console.log(`duration:  ${(bufLength(buf) / buf.sampleRate).toFixed(3)}s @ ${buf.sampleRate}Hz`);
   console.log(`rms:       ${rmsDb(buf).toFixed(2)} dBFS   peak: ${peakDb(buf).toFixed(2)} dBFS`);
   console.log(`silent:    ${isEffectivelySilent(buf)}`);
-  console.log(`loop seam: jump=${seam.boundaryJump.toFixed(4)} slope=${seam.slopeJump.toFixed(4)} ratio=${seam.seamRatio.toFixed(2)} -> ${seam.pass ? "PASS" : "FAIL"}`);
+  console.log(
+    `loop seam: jump=${seam.boundaryJump.toFixed(4)} slope=${seam.slopeJump.toFixed(4)} ratio=${seam.seamRatio.toFixed(2)} -> ${seam.pass ? "PASS" : "FAIL"}`,
+  );
   const keyFlag = args.flags.get("key");
   if (typeof keyFlag === "string") {
     const [tonic, mode] = keyFlag.split(/\s+/) as [string, string];
@@ -375,8 +449,12 @@ async function cmdAnalyze(args: Args): Promise<void> {
   const bpmFlag = args.flags.get("bpm");
   const t = detectTempo(buf);
   const conf = t.confidence < 0.4 ? " (low confidence — flat beat spectrum)" : "";
-  console.log(`tempo:     detected ${t.bpm.toFixed(1)} bpm, confidence ${t.confidence.toFixed(2)}${conf}` +
-    (typeof bpmFlag === "string" ? `  declared ${bpmFlag} -> ${tempoMatches(t.bpm, Number(bpmFlag)) ? "MATCH" : "MISMATCH"}` : ""));
+  console.log(
+    `tempo:     detected ${t.bpm.toFixed(1)} bpm, confidence ${t.confidence.toFixed(2)}${conf}` +
+      (typeof bpmFlag === "string"
+        ? `  declared ${bpmFlag} -> ${tempoMatches(t.bpm, Number(bpmFlag)) ? "MATCH" : "MISMATCH"}`
+        : ""),
+  );
 }
 
 async function cmdServe(args: Args): Promise<void> {
@@ -391,23 +469,30 @@ async function main(): Promise<void> {
   const args = parseArgs(rest);
   try {
     switch (cmd) {
-      case "params": return await cmdParams(args);
-      case "compose": return await cmdCompose(args);
-      case "ambience": return await cmdAmbience(args);
-      case "batch": return await cmdBatch(args);
-      case "preview": return await cmdPreview(args);
-      case "analyze": return await cmdAnalyze(args);
-      case "serve": return await cmdServe(args);
+      case "params":
+        return await cmdParams(args);
+      case "compose":
+        return await cmdCompose(args);
+      case "ambience":
+        return await cmdAmbience(args);
+      case "batch":
+        return await cmdBatch(args);
+      case "preview":
+        return await cmdPreview(args);
+      case "analyze":
+        return await cmdAnalyze(args);
+      case "serve":
+        return await cmdServe(args);
       default:
         console.error(
           "usage: score <params|compose|ambience|batch|preview|analyze|serve> ...\n" +
-          "  params   <desc.json> [--ingest reply.json|-] [--provider anthropic|groq] [--model id]\n" +
-          "  compose  <subject.json> --mood <mood> [--backend dsp|soundfont|api]\n" +
-          "  ambience <setting.json>\n" +
-          "  batch    <assets-dir> [--backend name|all] [--out dir]\n" +
-          "  preview  --mix <music.wav> <ambience.wav>\n" +
-          "  analyze  <file.wav> [--key 'C ionian'] [--bpm 96]\n" +
-          "  serve    [--fixtures fixtures] [--jobs jobs] [--port 4321]",
+            "  params   <desc.json> [--ingest reply.json|-] [--provider anthropic|groq] [--model id]\n" +
+            "  compose  <subject.json> --mood <mood> [--backend dsp|soundfont|api]\n" +
+            "  ambience <setting.json>\n" +
+            "  batch    <assets-dir> [--backend name|all] [--out dir]\n" +
+            "  preview  --mix <music.wav> <ambience.wav>\n" +
+            "  analyze  <file.wav> [--key 'C ionian'] [--bpm 96]\n" +
+            "  serve    [--fixtures fixtures] [--jobs jobs] [--port 4321]",
         );
         process.exit(cmd ? 1 : 0);
     }

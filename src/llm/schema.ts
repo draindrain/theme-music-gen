@@ -8,9 +8,20 @@
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import {
-  PitchClassSchema, ModeSchema, TempoSchema, ContourSchema, IntervalStyleSchema,
-  RhythmFeelSchema, BrightnessSchema, WeightSchema, InstrumentSchema,
-  TextureSchema, LayerLevelSchema, EventTypeSchema, DensitySchema, SpaceSchema,
+  PitchClassSchema,
+  ModeSchema,
+  TempoSchema,
+  ContourSchema,
+  IntervalStyleSchema,
+  RhythmFeelSchema,
+  BrightnessSchema,
+  WeightSchema,
+  InstrumentSchema,
+  TextureSchema,
+  LayerLevelSchema,
+  EventTypeSchema,
+  DensitySchema,
+  SpaceSchema,
 } from "../schema/params.ts";
 import type { ParamKind } from "./types.ts";
 
@@ -40,9 +51,7 @@ export const LocationParamsLlmSchema = z
       .array(z.object({ texture: TextureSchema, level: LayerLevelSchema }).strict())
       .min(1)
       .max(3),
-    events: z
-      .array(z.object({ type: EventTypeSchema, density: DensitySchema }).strict())
-      .max(3),
+    events: z.array(z.object({ type: EventTypeSchema, density: DensitySchema }).strict()).max(3),
     brightness: BrightnessSchema,
     space: SpaceSchema,
   })
@@ -55,8 +64,17 @@ export function llmSchemaFor(kind: ParamKind): z.ZodTypeAny {
 // Keywords OpenAI/Groq strict json_schema mode rejects; we strip them and let
 // Zod re-enforce the bounds after the model answers (parseParams in generate.ts).
 const STRICT_DROP = new Set([
-  "minItems", "maxItems", "minLength", "maxLength", "minimum", "maximum",
-  "exclusiveMinimum", "exclusiveMaximum", "pattern", "format", "multipleOf",
+  "minItems",
+  "maxItems",
+  "minLength",
+  "maxLength",
+  "minimum",
+  "maximum",
+  "exclusiveMinimum",
+  "exclusiveMaximum",
+  "pattern",
+  "format",
+  "multipleOf",
 ]);
 
 function clean(node: unknown, strict: boolean): unknown {
@@ -79,7 +97,10 @@ function clean(node: unknown, strict: boolean): unknown {
 }
 
 /** Build a JSON Schema for the reduced Zod schema. `strict` tailors it for Groq's strict mode. */
-export function toJsonSchema(schema: z.ZodTypeAny, opts: { strict: boolean }): Record<string, unknown> {
+export function toJsonSchema(
+  schema: z.ZodTypeAny,
+  opts: { strict: boolean },
+): Record<string, unknown> {
   const raw = zodToJsonSchema(schema, { $refStrategy: "none", target: "jsonSchema7" });
   return clean(raw, opts.strict) as Record<string, unknown>;
 }

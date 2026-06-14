@@ -45,9 +45,15 @@ describe("leitmotif identity", () => {
           for (let i = 1; i < n; i++) {
             const dPitch = Math.sign(window[i]!.midi - window[i - 1]!.midi);
             const dDeg = Math.sign(theme.degrees[i]! - theme.degrees[i - 1]!);
-            if (dPitch !== dDeg) { match = false; break; }
+            if (dPitch !== dDeg) {
+              match = false;
+              break;
+            }
           }
-          if (match) { found = true; break; }
+          if (match) {
+            found = true;
+            break;
+          }
         }
         expect(found, `${ch.id}/${mood}: theme contour not found in lead`).toBe(true);
       }
@@ -93,8 +99,10 @@ describe("score validity", () => {
             expect(note.velocity).toBeGreaterThan(0);
             expect(note.velocity).toBeLessThanOrEqual(1);
             if (!track.isPercussion) {
-              expect(scale.has(((note.midi % 12) + 12) % 12),
-                `${ch.id}/${mood}/${track.name} midi=${note.midi}`).toBe(true);
+              expect(
+                scale.has(((note.midi % 12) + 12) % 12),
+                `${ch.id}/${mood}/${track.name} midi=${note.midi}`,
+              ).toBe(true);
               expect(note.midi).toBeGreaterThanOrEqual(24);
               expect(note.midi).toBeLessThanOrEqual(108);
             }
@@ -117,7 +125,12 @@ describe("score validity", () => {
   it("moods differ in arrangement (layer sets differ across the mood space)", () => {
     const ch = characters.find((c) => c.id === "nyx")!;
     const layerSets = new Set(
-      MOODS.map((m) => composeScore(ch, m).tracks.map((t) => t.name).sort().join(",")),
+      MOODS.map((m) =>
+        composeScore(ch, m)
+          .tracks.map((t) => t.name)
+          .sort()
+          .join(","),
+      ),
     );
     expect(layerSets.size).toBeGreaterThanOrEqual(3);
   });
@@ -138,7 +151,10 @@ describe("song structure", () => {
     const ch = characters[0]!;
     const forms = MOODS.map((m) => {
       const s = composeScore(ch, m);
-      return `${s.loopBars}:${s.tracks.map((t) => t.name).sort().join(",")}`;
+      return `${s.loopBars}:${s.tracks
+        .map((t) => t.name)
+        .sort()
+        .join(",")}`;
     });
     expect(new Set(forms).size).toBeGreaterThanOrEqual(2);
   });
@@ -150,7 +166,10 @@ describe("song structure", () => {
     const differs = MOODS.some((mood) => {
       const sigs = characters.map((ch) => {
         const s = composeScore(ch, mood);
-        return `${s.loopBars}:${s.tracks.map((t) => t.name).sort().join(",")}`;
+        return `${s.loopBars}:${s.tracks
+          .map((t) => t.name)
+          .sort()
+          .join(",")}`;
       });
       return new Set(sigs).size > 1;
     });
@@ -173,7 +192,8 @@ describe("melody quality", () => {
     for (const ch of characters) {
       const theme = generateTheme(ch);
       const { degrees } = theme;
-      let leaps = 0, resolved = 0;
+      let leaps = 0,
+        resolved = 0;
       for (let i = 1; i + 1 < degrees.length; i++) {
         const step = degrees[i]! - degrees[i - 1]!;
         if (Math.abs(step) <= 1) continue;
@@ -205,7 +225,11 @@ describe("melody quality", () => {
       const theme = generateTheme(ch);
       const episode = generateEpisode(theme, rng.fork(ch.id));
       for (let i = 2; i < episode.degrees.length; i++) {
-        const w = trigramWeight(episode.degrees[i - 2]!, episode.degrees[i - 1]!, episode.degrees[i]!);
+        const w = trigramWeight(
+          episode.degrees[i - 2]!,
+          episode.degrees[i - 1]!,
+          episode.degrees[i]!,
+        );
         expect(w, `episode trigram too low at i=${i}`).toBeGreaterThan(THRESHOLD);
       }
     }

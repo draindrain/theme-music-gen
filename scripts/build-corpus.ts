@@ -26,37 +26,55 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // ---------- music theory constants ----------
 
 const MODE_INTERVALS: Record<string, readonly number[]> = {
-  ionian:         [0, 2, 4, 5, 7, 9, 11],
-  lydian:         [0, 2, 4, 6, 7, 9, 11],
-  mixolydian:     [0, 2, 4, 5, 7, 9, 10],
-  dorian:         [0, 2, 3, 5, 7, 9, 10],
-  aeolian:        [0, 2, 3, 5, 7, 8, 10],
+  ionian: [0, 2, 4, 5, 7, 9, 11],
+  lydian: [0, 2, 4, 6, 7, 9, 11],
+  mixolydian: [0, 2, 4, 5, 7, 9, 10],
+  dorian: [0, 2, 3, 5, 7, 9, 10],
+  aeolian: [0, 2, 3, 5, 7, 8, 10],
   harmonic_minor: [0, 2, 3, 5, 7, 8, 11],
-  phrygian:       [0, 1, 3, 5, 7, 8, 10],
+  phrygian: [0, 1, 3, 5, 7, 8, 10],
 };
 
 // White-key pitch classes: C=0, D=2, E=4, F=5, G=7, A=9, B=11
 const WHITE_KEY_PC: Record<string, number> = {
-  C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11,
+  C: 0,
+  D: 2,
+  E: 4,
+  F: 5,
+  G: 7,
+  A: 9,
+  B: 11,
 };
 const LETTERS = "CDEFGAB";
 
 // ABC mode name aliases → our internal mode IDs
 const MODE_ALIASES: Record<string, string> = {
-  "": "ionian", "maj": "ionian", "ion": "ionian", "major": "ionian", "ionian": "ionian",
-  "min": "aeolian", "aeo": "aeolian", "minor": "aeolian", "m": "aeolian", "aeolian": "aeolian",
-  "dor": "dorian", "dorian": "dorian",
-  "mix": "mixolydian", "mixolydian": "mixolydian",
-  "phr": "phrygian", "phrygian": "phrygian",
-  "lyd": "lydian", "lydian": "lydian",
+  "": "ionian",
+  maj: "ionian",
+  ion: "ionian",
+  major: "ionian",
+  ionian: "ionian",
+  min: "aeolian",
+  aeo: "aeolian",
+  minor: "aeolian",
+  m: "aeolian",
+  aeolian: "aeolian",
+  dor: "dorian",
+  dorian: "dorian",
+  mix: "mixolydian",
+  mixolydian: "mixolydian",
+  phr: "phrygian",
+  phrygian: "phrygian",
+  lyd: "lydian",
+  lydian: "lydian",
 };
 
 // ---------- key parsing ----------
 
 interface Key {
-  tonic: number;              // chromatic PC 0–11
+  tonic: number; // chromatic PC 0–11
   intervals: readonly number[];
-  letterStart: number;        // index into CDEFGAB for the tonic letter
+  letterStart: number; // index into CDEFGAB for the tonic letter
 }
 
 function parseKey(s: string): Key | null {
@@ -70,7 +88,7 @@ function parseKey(s: string): Key | null {
   const basePc = WHITE_KEY_PC[letter];
   if (basePc === undefined) return null;
 
-  const tonic = ((basePc + (acc === "#" ? 1 : acc === "b" ? -1 : 0)) % 12 + 12) % 12;
+  const tonic = (((basePc + (acc === "#" ? 1 : acc === "b" ? -1 : 0)) % 12) + 12) % 12;
   const letterStart = LETTERS.indexOf(letter);
 
   const modeId = MODE_ALIASES[modePart];
@@ -131,7 +149,7 @@ function extractDegrees(body: string, key: Key): number[] {
     if (acc === "^") {
       pc = (basePc + 1) % 12;
     } else if (acc === "_") {
-      pc = ((basePc - 1) % 12 + 12) % 12;
+      pc = (((basePc - 1) % 12) + 12) % 12;
     } else if (acc === "=") {
       pc = basePc;
     } else {
@@ -195,7 +213,9 @@ function splitMeasures(cleaned: string): { text: string; strongAfter: boolean }[
 }
 
 /** Group measures into phrases at strong boundaries; fall back to 4-bar chunks. */
-function groupPhrases(measures: { text: string; strongAfter: boolean }[]): { text: string; bars: number }[] {
+function groupPhrases(
+  measures: { text: string; strongAfter: boolean }[],
+): { text: string; bars: number }[] {
   const phrases: { text: string; bars: number }[] = [];
   let buf: string[] = [];
   for (let i = 0; i < measures.length; i++) {
@@ -220,7 +240,8 @@ function groupPhrases(measures: { text: string; strongAfter: boolean }[]): { tex
 function resample(degs: number[], len = 8): number[] {
   if (degs.length === 0) return new Array<number>(len).fill(0);
   const out: number[] = [];
-  for (let i = 0; i < len; i++) out.push(degs[Math.min(degs.length - 1, Math.floor((i * degs.length) / len))]!);
+  for (let i = 0; i < len; i++)
+    out.push(degs[Math.min(degs.length - 1, Math.floor((i * degs.length) / len))]!);
   return out;
 }
 
@@ -242,7 +263,11 @@ function clusterForm(vecs: number[][]): string {
   for (const v of vecs) {
     let assigned = clusters.findIndex((c) => phraseSimilar(c, v));
     if (assigned === -1) {
-      if (clusters.length >= 4) { overCap = true; labels.push("?"); continue; }
+      if (clusters.length >= 4) {
+        overCap = true;
+        labels.push("?");
+        continue;
+      }
       clusters.push(v);
       assigned = clusters.length - 1;
     }
@@ -269,14 +294,23 @@ function normBars(b: number): number {
 type Region = "chinese" | "german" | "celtic" | "french" | "session" | "hymn";
 
 const REGION_ORDER: readonly Region[] = [
-  "chinese", "german", "celtic", "french", "session", "hymn",
+  "chinese",
+  "german",
+  "celtic",
+  "french",
+  "session",
+  "hymn",
 ];
 
-interface FormEntry { form: string; barsPerPhrase: number[]; weight: number }
+interface FormEntry {
+  form: string;
+  barsPerPhrase: number[];
+  weight: number;
+}
 
 interface RegionStats {
-  bigrams: number[][];      // 7x7 integer counts
-  trigrams: number[][][];   // 7x7x7 integer counts
+  bigrams: number[][]; // 7x7 integer counts
+  trigrams: number[][][]; // 7x7x7 integer counts
   formCounts: Map<string, FormEntry>;
   tunes: number;
 }
@@ -285,15 +319,14 @@ function emptyRegionStats(): RegionStats {
   return {
     bigrams: Array.from({ length: 7 }, () => new Array<number>(7).fill(0)),
     trigrams: Array.from({ length: 7 }, () =>
-      Array.from({ length: 7 }, () => new Array<number>(7).fill(0))),
+      Array.from({ length: 7 }, () => new Array<number>(7).fill(0)),
+    ),
     formCounts: new Map(),
     tunes: 0,
   };
 }
 
-const regionStats = new Map<Region, RegionStats>(
-  REGION_ORDER.map((r) => [r, emptyRegionStats()]),
-);
+const regionStats = new Map<Region, RegionStats>(REGION_ORDER.map((r) => [r, emptyRegionStats()]));
 
 function accumulateForm(body: string, key: Key, stats: RegionStats): void {
   const phrases = groupPhrases(splitMeasures(cleanBody(body)));
@@ -398,17 +431,20 @@ function combineBigrams(): number[][] {
 
 function combineTrigrams(): number[][][] {
   const out = Array.from({ length: 7 }, () =>
-    Array.from({ length: 7 }, () => new Array<number>(7).fill(0)));
+    Array.from({ length: 7 }, () => new Array<number>(7).fill(0)),
+  );
   for (const region of REGION_ORDER) {
     const tri = regionStats.get(region)!.trigrams;
     // One factor per region (normalize the whole trigram mass) preserves the
     // region's internal contour shape while equalizing across regions.
     let total = 0;
-    for (let p = 0; p < 7; p++) for (let c = 0; c < 7; c++) for (let n = 0; n < 7; n++) total += tri[p]![c]![n]!;
+    for (let p = 0; p < 7; p++)
+      for (let c = 0; c < 7; c++) for (let n = 0; n < 7; n++) total += tri[p]![c]![n]!;
     if (total === 0) continue;
     const factor = (REGION_MASS * DEGREE_WEIGHT[region]) / total;
-    for (let p = 0; p < 7; p++) for (let c = 0; c < 7; c++) for (let n = 0; n < 7; n++)
-      out[p]![c]![n]! += tri[p]![c]![n]! * factor;
+    for (let p = 0; p < 7; p++)
+      for (let c = 0; c < 7; c++)
+        for (let n = 0; n < 7; n++) out[p]![c]![n]! += tri[p]![c]![n]! * factor;
   }
   return out;
 }
@@ -421,7 +457,8 @@ function combineFormCounts(): Map<string, FormEntry> {
     for (const e of fc.values()) total += e.weight;
     if (total === 0) continue;
     const factor = (FORM_MASS * FORM_WEIGHT[region]) / total;
-    for (const sig of [...fc.keys()].sort()) {        // sorted -> deterministic float adds
+    for (const sig of [...fc.keys()].sort()) {
+      // sorted -> deterministic float adds
       const e = fc.get(sig)!;
       const cur = out.get(sig) ?? { form: e.form, barsPerPhrase: e.barsPerPhrase, weight: 0 };
       cur.weight += e.weight * factor;
@@ -440,7 +477,9 @@ function buildFormTemplates(combined: Map<string, FormEntry>, limit = 40): FormT
       weight: Math.max(1, Math.round(e.weight)),
       totalBars: e.barsPerPhrase.reduce((a, b) => a + b, 0),
     }))
-    .sort((a, b) => b.weight - a.weight || a.form.localeCompare(b.form) || a.totalBars - b.totalBars)
+    .sort(
+      (a, b) => b.weight - a.weight || a.form.localeCompare(b.form) || a.totalBars - b.totalBars,
+    )
     .slice(0, limit);
   return templates.length > 0 ? templates : FALLBACK_TEMPLATES;
 }
@@ -451,7 +490,12 @@ const ESSEN =
   "https://raw.githubusercontent.com/cuthbertLab/music21/master/music21/corpus/essenFolksong";
 
 type SourceKind = "abc-url" | "session-csv" | "abc-local";
-interface Source { kind: SourceKind; ref: string; region: Region; label: string }
+interface Source {
+  kind: SourceKind;
+  ref: string;
+  region: Region;
+  label: string;
+}
 
 function essen(file: string, region: Region): Source {
   return { kind: "abc-url", ref: `${ESSEN}/${file}.abc`, region, label: `${file}.abc` };
@@ -463,21 +507,36 @@ function essen(file: string, region: Region): Source {
 // network at build time.
 const SOURCES: Source[] = [
   // Chinese (Han) folk song — the original corpus.
-  essen("han1", "chinese"), essen("han2", "chinese"),
+  essen("han1", "chinese"),
+  essen("han2", "chinese"),
   // German / Central-European Essen collections.
-  essen("altdeu10", "german"), essen("altdeu20", "german"),
-  essen("ballad10", "german"), essen("ballad20", "german"), essen("ballad30", "german"),
-  essen("ballad40", "german"), essen("ballad50", "german"), essen("ballad60", "german"),
-  essen("ballad70", "german"), essen("ballad80", "german"),
-  essen("boehme10", "german"), essen("boehme20", "german"),
+  essen("altdeu10", "german"),
+  essen("altdeu20", "german"),
+  essen("ballad10", "german"),
+  essen("ballad20", "german"),
+  essen("ballad30", "german"),
+  essen("ballad40", "german"),
+  essen("ballad50", "german"),
+  essen("ballad60", "german"),
+  essen("ballad70", "german"),
+  essen("ballad80", "german"),
+  essen("boehme10", "german"),
+  essen("boehme20", "german"),
   essen("dva0", "german"),
-  essen("erk5", "german"), essen("erk10", "german"), essen("erk20", "german"), essen("erk30", "german"),
-  essen("fink0", "german"), essen("folkHaydn", "german"), essen("kinder0", "german"),
-  essen("variant0", "german"), essen("zuccal0", "german"),
+  essen("erk5", "german"),
+  essen("erk10", "german"),
+  essen("erk20", "german"),
+  essen("erk30", "german"),
+  essen("fink0", "german"),
+  essen("folkHaydn", "german"),
+  essen("kinder0", "german"),
+  essen("variant0", "german"),
+  essen("zuccal0", "german"),
   // Irish (Essen).
   essen("irl", "celtic"),
   // Francophone (Lorraine, Luxembourg).
-  essen("lot", "french"), essen("lux", "french"),
+  essen("lot", "french"),
+  essen("lux", "french"),
   // thesession.org dump (ODbL) — Irish/Scottish dance tunes, strong AABB structure.
   {
     kind: "session-csv",
@@ -511,19 +570,29 @@ function parseCsvRows(text: string): string[][] {
     const ch = text[i]!;
     if (inQuotes) {
       if (ch === '"') {
-        if (text[i + 1] === '"') { field += '"'; i++; } else inQuotes = false;
+        if (text[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else inQuotes = false;
       } else field += ch;
     } else if (ch === '"') {
       inQuotes = true;
     } else if (ch === ",") {
-      row.push(field); field = "";
+      row.push(field);
+      field = "";
     } else if (ch === "\n") {
-      row.push(field); rows.push(row); row = []; field = "";
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
     } else if (ch !== "\r") {
       field += ch;
     }
   }
-  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
   return rows;
 }
 
@@ -536,7 +605,8 @@ function parseCsvRows(text: string): string[][] {
 function sessionTunes(csv: string): string[] {
   const rows = parseCsvRows(csv);
   const tunes: string[] = [];
-  for (let r = 1; r < rows.length; r++) { // skip header
+  for (let r = 1; r < rows.length; r++) {
+    // skip header
     const cols = rows[r]!;
     if (cols.length < 7) continue;
     const meter = cols[4]!.trim();
@@ -590,11 +660,17 @@ async function main(): Promise<void> {
     // No network: preserve the committed melodic tables, only ensure the
     // form-template catalog exists (hand-authored fallback). The vendored local
     // source alone is not enough to rebuild a balanced corpus.
-    console.error("No networked tunes processed (no network?). Preserving existing tables, adding fallback form templates.");
+    console.error(
+      "No networked tunes processed (no network?). Preserving existing tables, adding fallback form templates.",
+    );
     const existing = JSON.parse(readFileSync(outPath, "utf8")) as {
-      bigrams: number[][]; trigrams: number[][][]; formTemplates?: FormTemplate[];
+      bigrams: number[][];
+      trigrams: number[][][];
+      formTemplates?: FormTemplate[];
     };
-    existing.formTemplates = existing.formTemplates?.length ? existing.formTemplates : FALLBACK_TEMPLATES;
+    existing.formTemplates = existing.formTemplates?.length
+      ? existing.formTemplates
+      : FALLBACK_TEMPLATES;
     writeFileSync(outPath, JSON.stringify(existing));
     console.log(`Wrote ${outPath} (fallback form templates: ${existing.formTemplates.length})`);
     return;
@@ -604,7 +680,8 @@ async function main(): Promise<void> {
   console.log("\nPer-region tunes:");
   for (const region of REGION_ORDER) {
     const s = regionStats.get(region)!;
-    if (s.tunes > 0) console.log(`  ${region.padEnd(8)} ${s.tunes} tunes, ${s.formCounts.size} form signatures`);
+    if (s.tunes > 0)
+      console.log(`  ${region.padEnd(8)} ${s.tunes} tunes, ${s.formCounts.size} form signatures`);
   }
   console.log(`Processed ${totalTunes} tunes total`);
 
@@ -624,7 +701,7 @@ async function main(): Promise<void> {
       const smoothed = curr.map((c) => c + 1);
       const total = smoothed.reduce((a, b) => a + b, 0);
       return smoothed.map((c) => c / total);
-    })
+    }),
   );
 
   const formTemplates = buildFormTemplates(combineFormCounts());
@@ -635,7 +712,9 @@ async function main(): Promise<void> {
   writeFileSync(outPath, JSON.stringify(out));
   console.log(`Wrote ${outPath}`);
   console.log(`Table size: bigrams 7×7, trigrams 7×7×7, form templates: ${formTemplates.length}`);
-  console.log(`Through-composed (TC) share of form weight: ${(100 * tcWeight / allWeight).toFixed(1)}%`);
+  console.log(
+    `Through-composed (TC) share of form weight: ${((100 * tcWeight) / allWeight).toFixed(1)}%`,
+  );
 }
 
 main().catch((e: unknown) => {

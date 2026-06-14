@@ -4,9 +4,21 @@
  * `params --ingest`. The tool itself never calls an LLM.
  */
 import {
-  BRIGHTNESS, CONTOURS, DENSITIES, EVENT_TYPES, INSTRUMENTS, INTERVAL_STYLES,
-  LAYER_LEVELS, MODES, PITCH_CLASSES, RHYTHM_FEELS, SPACES, TEMPOS, TEXTURES,
-  WEIGHTS, type Description,
+  BRIGHTNESS,
+  CONTOURS,
+  DENSITIES,
+  EVENT_TYPES,
+  INSTRUMENTS,
+  INTERVAL_STYLES,
+  LAYER_LEVELS,
+  MODES,
+  PITCH_CLASSES,
+  RHYTHM_FEELS,
+  SPACES,
+  TEMPOS,
+  TEXTURES,
+  WEIGHTS,
+  type Description,
 } from "./params.ts";
 
 const list = (xs: readonly string[]) => xs.map((x) => `"${x}"`).join(" | ");

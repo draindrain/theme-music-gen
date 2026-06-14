@@ -6,6 +6,7 @@
  * any network dependency at runtime.
  */
 import data from "./corpus-data.json" with { type: "json" };
+import { degreeClass } from "../theory/theory.ts";
 
 // ---------------------------------------------------------------------------
 // Phrase-form templates — high-level song structure mined from the corpus.
@@ -52,18 +53,14 @@ export function formTemplates(): FormTemplate[] {
   return fromData && fromData.length > 0 ? fromData : FALLBACK_TEMPLATES;
 }
 
-function mod7(d: number): number {
-  return ((d % 7) + 7) % 7;
-}
-
 /**
  * P(next | prev, curr) from the trigram table with bigram backoff.
  * All inputs are absolute scale degrees (any integer; normalized mod 7 internally).
  */
 export function trigramWeight(prev: number, curr: number, next: number): number {
-  const p = mod7(prev);
-  const c = mod7(curr);
-  const n = mod7(next);
+  const p = degreeClass(prev);
+  const c = degreeClass(curr);
+  const n = degreeClass(next);
   const tri = (data.trigrams[p] as number[][])[c]?.[n];
   if (tri !== undefined && tri > 0) return tri;
   return bigramWeight(curr, next);
@@ -74,7 +71,7 @@ export function trigramWeight(prev: number, curr: number, next: number): number 
  * All inputs are absolute scale degrees (any integer; normalized mod 7 internally).
  */
 export function bigramWeight(curr: number, next: number): number {
-  const c = mod7(curr);
-  const n = mod7(next);
+  const c = degreeClass(curr);
+  const n = degreeClass(next);
   return (data.bigrams[c] as number[])?.[n] ?? 1 / 7;
 }

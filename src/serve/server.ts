@@ -12,21 +12,38 @@ import { createServer } from "node:http";
 import { createReadStream, existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { basename, extname, join, normalize, relative, resolve, sep } from "node:path";
 import {
-  FORMATS, readManifest, renderSet, RenderRequestError,
-  type Format, type Manifest, type RenderItem,
+  FORMATS,
+  renderSet,
+  RenderRequestError,
+  type Format,
+  type Manifest,
+  type RenderItem,
 } from "../pipeline.ts";
 import {
-  MOODS, MoodSchema, parseDescription, parseParams, ParamValidationError,
-  PITCH_CLASSES, MODES, TEMPOS, CONTOURS, INTERVAL_STYLES, RHYTHM_FEELS,
-  INSTRUMENTS, BRIGHTNESS, WEIGHTS,
-  type Description, type Mood, type Params,
+  MOODS,
+  MoodSchema,
+  parseDescription,
+  parseParams,
+  ParamValidationError,
+  PITCH_CLASSES,
+  MODES,
+  TEMPOS,
+  CONTOURS,
+  INTERVAL_STYLES,
+  RHYTHM_FEELS,
+  INSTRUMENTS,
+  BRIGHTNESS,
+  WEIGHTS,
+  type Description,
+  type Mood,
+  type Params,
 } from "../schema/params.ts";
 import { characterPrompt, locationPrompt } from "../schema/prompt.ts";
 import { generateParams } from "../llm/generate.ts";
 import { MODEL_CATALOG } from "../llm/types.ts";
 import { listBackends } from "../synth/backend.ts";
 import { haveBinary } from "../post/post.ts";
-import { hashString } from "../util/prng.ts";
+import { defaultSeed } from "../util/prng.ts";
 import { cleanupOldJobs, createJob, isJobId, jobDir, zipJob } from "./jobs.ts";
 import { PAGE_HTML } from "./page.ts";
 
@@ -50,13 +67,11 @@ function safeJoin(root: string, rel: string): string | null {
   return abs.startsWith(resolve(root) + sep) || abs === resolve(root) ? abs : null;
 }
 
-/** The default seed the copy-paste flow prints — keep prompts reproducible. */
-function defaultSeed(id: string): number {
-  return hashString(id) % 0xffffffff;
-}
-
 /** Read the bundled fixtures into descriptions + params for the seed profile. */
-function readSeed(fixturesDir: string): { descriptions: Description[]; params: Record<string, Params> } {
+function readSeed(fixturesDir: string): {
+  descriptions: Description[];
+  params: Record<string, Params>;
+} {
   const descriptions: Description[] = [];
   const params: Record<string, Params> = {};
   for (const sub of ["characters", "locations"]) {
@@ -68,7 +83,8 @@ function readSeed(fixturesDir: string): { descriptions: Description[]; params: R
       const desc = parseDescription(JSON.parse(readFileSync(descPath, "utf8")), descPath);
       descriptions.push(desc);
       const pPath = join(dir, basename(f, ".json") + ".params.json");
-      if (existsSync(pPath)) params[desc.id] = parseParams(JSON.parse(readFileSync(pPath, "utf8")), pPath);
+      if (existsSync(pPath))
+        params[desc.id] = parseParams(JSON.parse(readFileSync(pPath, "utf8")), pPath);
     }
   }
   return { descriptions, params };
@@ -110,12 +126,21 @@ export async function startServer(opts: ServeOpts): Promise<import("node:http").
       if (req.method === "GET" && url.pathname === "/api/capabilities") {
         const backends = listBackends().map((b) => ({ name: b.name, ...b.availability() }));
         return json(200, {
-          backends, moods: MOODS, models: MODEL_CATALOG,
-          formats: FORMATS, haveFfmpeg: haveBinary("ffmpeg"),
+          backends,
+          moods: MOODS,
+          models: MODEL_CATALOG,
+          formats: FORMATS,
+          haveFfmpeg: haveBinary("ffmpeg"),
           enums: {
-            pitchClasses: PITCH_CLASSES, modes: MODES, tempos: TEMPOS,
-            contours: CONTOURS, intervalStyles: INTERVAL_STYLES, rhythmFeels: RHYTHM_FEELS,
-            instruments: INSTRUMENTS, brightness: BRIGHTNESS, weights: WEIGHTS,
+            pitchClasses: PITCH_CLASSES,
+            modes: MODES,
+            tempos: TEMPOS,
+            contours: CONTOURS,
+            intervalStyles: INTERVAL_STYLES,
+            rhythmFeels: RHYTHM_FEELS,
+            instruments: INSTRUMENTS,
+            brightness: BRIGHTNESS,
+            weights: WEIGHTS,
           },
         });
       }
@@ -127,7 +152,10 @@ export async function startServer(opts: ServeOpts): Promise<import("node:http").
 
       // ---- validate a description or params object ----
       if (req.method === "POST" && url.pathname === "/api/validate") {
-        const body = JSON.parse(await readBody(req)) as { kind: "description" | "params"; content: unknown };
+        const body = JSON.parse(await readBody(req)) as {
+          kind: "description" | "params";
+          content: unknown;
+        };
         if (body.kind === "description") parseDescription(body.content, "description");
         else parseParams(body.content, "params");
         return json(200, { ok: true });
@@ -138,21 +166,28 @@ export async function startServer(opts: ServeOpts): Promise<import("node:http").
         const body = JSON.parse(await readBody(req)) as { description: unknown };
         const desc = parseDescription(body.description, "description");
         const seed = defaultSeed(desc.id);
-        const prompt = desc.kind === "character" ? characterPrompt(desc, seed) : locationPrompt(desc, seed);
+        const prompt =
+          desc.kind === "character" ? characterPrompt(desc, seed) : locationPrompt(desc, seed);
         return json(200, { prompt });
       }
 
       // ---- generate params via an LLM (session-only API key) ----
       if (req.method === "POST" && url.pathname === "/api/generate-params") {
         const body = JSON.parse(await readBody(req)) as {
-          description: unknown; provider: string; model: string; apiKey: string;
+          description: unknown;
+          provider: string;
+          model: string;
+          apiKey: string;
         };
         const desc = parseDescription(body.description, "description");
         if (!body.apiKey) return json(400, { error: "missing API key" });
         try {
           const params = await generateParams({
-            providerName: body.provider, model: body.model, apiKey: body.apiKey,
-            desc, seed: defaultSeed(desc.id),
+            providerName: body.provider,
+            model: body.model,
+            apiKey: body.apiKey,
+            desc,
+            seed: defaultSeed(desc.id),
           });
           return json(200, { params });
         } catch (e) {
@@ -166,7 +201,9 @@ export async function startServer(opts: ServeOpts): Promise<import("node:http").
         cleanupOldJobs(jobsDir, JOB_TTL_MS);
         const body = JSON.parse(await readBody(req)) as {
           items: { description: unknown; params: unknown }[];
-          moods?: string[]; formats?: string[]; backends?: string[];
+          moods?: string[];
+          formats?: string[];
+          backends?: string[];
         };
         if (!Array.isArray(body.items) || body.items.length === 0)
           return json(400, { error: "no items selected to generate" });
@@ -178,13 +215,17 @@ export async function startServer(opts: ServeOpts): Promise<import("node:http").
         }));
         const moods: Mood[] | undefined = body.moods?.map((m) => MoodSchema.parse(m));
         const formats = (body.formats ?? FORMATS).filter((f): f is Format =>
-          (FORMATS as readonly string[]).includes(f));
+          (FORMATS as readonly string[]).includes(f),
+        );
         if (!formats.includes("wav")) formats.push("wav"); // wav is always emitted
         const backends = body.backends ?? [];
 
         const { id, dir } = createJob(jobsDir);
         const { manifest } = await renderSet(items, {
-          outDir: dir, formats, backends, ...(moods ? { moods } : {}),
+          outDir: dir,
+          formats,
+          backends,
+          ...(moods ? { moods } : {}),
         });
         return json(200, { job: id, manifest: relativizeManifest(manifest, dir) });
       }
@@ -216,8 +257,22 @@ export async function startServer(opts: ServeOpts): Promise<import("node:http").
           "cache-control": "no-store",
         });
         const stream = createReadStream(zipPath);
+        const cleanup = () => {
+          try {
+            rmSync(zipPath, { force: true });
+          } catch {
+            /* ignore */
+          }
+        };
+        stream.on("error", (err) => {
+          // A read failure mid-transfer must not crash the server. Abort the
+          // response (headers are already sent, so we can't send a 500) and
+          // still remove the temp zip.
+          res.destroy(err);
+          cleanup();
+        });
+        stream.on("close", cleanup);
         stream.pipe(res);
-        stream.on("close", () => { try { rmSync(zipPath, { force: true }); } catch { /* ignore */ } });
         return;
       }
 

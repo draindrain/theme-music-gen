@@ -14,7 +14,8 @@ export const groqProvider: ParamLlmProvider = {
   name: "groq",
   async generate(req: ParamGenRequest): Promise<unknown> {
     const { default: OpenAI } = await import("openai");
-    const client = (req.client as InstanceType<typeof OpenAI>) ??
+    const client =
+      (req.client as InstanceType<typeof OpenAI>) ??
       new OpenAI({ apiKey: req.apiKey, baseURL: GROQ_BASE_URL });
 
     const strict = modelInfo("groq", req.model)?.strictJsonSchema ?? false;
@@ -39,7 +40,7 @@ export const groqProvider: ParamLlmProvider = {
     try {
       return JSON.parse(content);
     } catch (e) {
-      throw new Error(`Groq response was not valid JSON: ${(e as Error).message}`);
+      throw new Error(`Groq response was not valid JSON: ${(e as Error).message}`, { cause: e });
     }
   },
 };

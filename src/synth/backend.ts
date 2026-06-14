@@ -36,9 +36,7 @@ export function registerBackend(b: SynthBackend): void {
 export function getBackend(name: string): SynthBackend {
   const b = registry.get(name);
   if (!b) {
-    throw new Error(
-      `Unknown backend "${name}". Available: ${[...registry.keys()].join(", ")}`,
-    );
+    throw new Error(`Unknown backend "${name}". Available: ${[...registry.keys()].join(", ")}`);
   }
   return b;
 }

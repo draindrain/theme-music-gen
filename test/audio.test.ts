@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { createBuf, bufLength } from "../src/audio/buffer.ts";
 import { decodeWav, encodeWavPcm16 } from "../src/audio/wav.ts";
 import {
-  crossfadeLoop, normalizeLoudness, peakDb, rmsDb, wrapTailIntoLoop, TARGET_RMS_DB,
+  crossfadeLoop,
+  normalizeLoudness,
+  peakDb,
+  rmsDb,
+  wrapTailIntoLoop,
+  TARGET_RMS_DB,
 } from "../src/post/post.ts";
 import { loopSeamReport } from "../src/analysis/analyze.ts";
 

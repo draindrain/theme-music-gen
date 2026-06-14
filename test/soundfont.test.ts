@@ -7,7 +7,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  detectTempoBpm, inKeyEnergyRatio, isEffectivelySilent, loopSeamReport, tempoMatches,
+  detectTempoBpm,
+  inKeyEnergyRatio,
+  isEffectivelySilent,
+  loopSeamReport,
+  tempoMatches,
 } from "../src/analysis/analyze.ts";
 import { bufLength } from "../src/audio/buffer.ts";
 import { composeScore } from "../src/compose/arrange.ts";
@@ -23,7 +27,13 @@ const SR = 44100;
 describe.skipIf(!available)("soundfont backend (fluidsynth)", () => {
   it("meets the output contract: duration, loudness, key, tempo, seam", async () => {
     const params = parseCharacterParams(
-      JSON.parse(readFileSync(join(import.meta.dirname, "..", "fixtures", "characters", "nyx.params.json"), "utf8")));
+      JSON.parse(
+        readFileSync(
+          join(import.meta.dirname, "..", "fixtures", "characters", "nyx.params.json"),
+          "utf8",
+        ),
+      ),
+    );
     const score = composeScore(params, "tense");
     const { audio, loop } = await soundfontBackend.render(score, { sampleRate: SR });
     const loopSamples = loop.kind === "wrap" ? loop.loopSamples : 0;
@@ -41,14 +51,21 @@ describe.skipIf(!available)("soundfont backend (fluidsynth)", () => {
 describe("midi export", () => {
   it("writes a structurally valid format-1 SMF", () => {
     const params = parseCharacterParams(
-      JSON.parse(readFileSync(join(import.meta.dirname, "..", "fixtures", "characters", "elara.params.json"), "utf8")));
+      JSON.parse(
+        readFileSync(
+          join(import.meta.dirname, "..", "fixtures", "characters", "elara.params.json"),
+          "utf8",
+        ),
+      ),
+    );
     const score = composeScore(params, "playful");
     const midi = scoreToMidi(score);
     expect(midi.toString("ascii", 0, 4)).toBe("MThd");
     expect(midi.readUInt16BE(8)).toBe(1); // format 1
     expect(midi.readUInt16BE(10)).toBe(score.tracks.length + 1);
     // count MTrk chunks by walking the chunk structure
-    let pos = 14, tracks = 0;
+    let pos = 14,
+      tracks = 0;
     while (pos + 8 <= midi.length) {
       expect(midi.toString("ascii", pos, pos + 4)).toBe("MTrk");
       tracks++;

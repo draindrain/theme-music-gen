@@ -22,6 +22,11 @@ export function pitchClassIndex(pc: PitchClass): number {
   return PITCH_CLASSES.indexOf(pc);
 }
 
+/** Normalize a scale degree to its in-octave step 0..6 (true modulo, handles negatives). */
+export function degreeClass(degree: number): number {
+  return ((degree % 7) + 7) % 7;
+}
+
 export interface Key {
   tonic: PitchClass;
   mode: Mode;
@@ -40,7 +45,7 @@ export function scalePitchClasses(key: Key): Set<number> {
 export function degreeToMidi(key: Key, degree: number, octave: number): number {
   const ivs = MODE_INTERVALS[key.mode];
   const oct = Math.floor(degree / 7);
-  const step = ((degree % 7) + 7) % 7;
+  const step = degreeClass(degree);
   return 12 * (octave + 1 + oct) + pitchClassIndex(key.tonic) + ivs[step]!;
 }
 
