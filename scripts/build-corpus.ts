@@ -9,9 +9,10 @@
  * Run once: tsx scripts/build-corpus.ts
  */
 
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { FALLBACK_TEMPLATES, type FormTemplate } from "../src/compose/corpus.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -142,6 +143,130 @@ function extractDegrees(body: string, key: Key): number[] {
   return degrees;
 }
 
+// ---------- phrase / form extraction ----------
+
+// Barline tokens: end-repeat, start-repeat, thin-thick variants, double bar,
+// single bar, and (treated as a boundary) newline.
+const BARLINE_RE = /(:\||\|:|::|\|\]|\|\||\||\n)/g;
+
+/** Strip ABC clutter that isn't a note letter or a barline. */
+function cleanBody(body: string): string {
+  return body
+    .replace(/%[^\n]*/g, "\n") // comments
+    .replace(/"[^"]*"/g, " ") // chord symbols / annotations
+    .replace(/![^!\n]*!/g, " ") // !decorations!
+    .replace(/\{[^}]*\}/g, " ") // grace notes
+    .replace(/\[[A-Za-z]:[^\]]*\]/g, " "); // inline fields [K:..]
+}
+
+/** Split into measures, recording whether each is followed by a strong boundary. */
+function splitMeasures(cleaned: string): { text: string; strongAfter: boolean }[] {
+  const measures: { text: string; strongAfter: boolean }[] = [];
+  let pending = "";
+  let lastIdx = 0;
+  let m: RegExpExecArray | null;
+  BARLINE_RE.lastIndex = 0;
+  const flush = (tok: string) => {
+    const strong = tok !== "|";
+    if (/[A-Ga-g]/.test(pending)) {
+      measures.push({ text: pending, strongAfter: strong });
+    } else if (strong && measures.length) {
+      measures[measures.length - 1]!.strongAfter = true;
+    }
+    pending = "";
+  };
+  while ((m = BARLINE_RE.exec(cleaned)) !== null) {
+    pending += cleaned.slice(lastIdx, m.index);
+    lastIdx = BARLINE_RE.lastIndex;
+    flush(m[0]!);
+  }
+  pending += cleaned.slice(lastIdx);
+  flush("||"); // final measure closes a phrase
+  return measures;
+}
+
+/** Group measures into phrases at strong boundaries; fall back to 4-bar chunks. */
+function groupPhrases(measures: { text: string; strongAfter: boolean }[]): { text: string; bars: number }[] {
+  const phrases: { text: string; bars: number }[] = [];
+  let buf: string[] = [];
+  for (let i = 0; i < measures.length; i++) {
+    buf.push(measures[i]!.text);
+    if (measures[i]!.strongAfter || i === measures.length - 1) {
+      if (buf.length) phrases.push({ text: buf.join(" "), bars: buf.length });
+      buf = [];
+    }
+  }
+  if (phrases.length < 2 && measures.length >= 4) {
+    const chunks: { text: string; bars: number }[] = [];
+    for (let i = 0; i < measures.length; i += 4) {
+      const chunk = measures.slice(i, i + 4);
+      chunks.push({ text: chunk.map((c) => c.text).join(" "), bars: chunk.length });
+    }
+    return chunks;
+  }
+  return phrases;
+}
+
+/** Resample a degree sequence to a fixed-length vector for similarity comparison. */
+function resample(degs: number[], len = 8): number[] {
+  if (degs.length === 0) return new Array<number>(len).fill(0);
+  const out: number[] = [];
+  for (let i = 0; i < len; i++) out.push(degs[Math.min(degs.length - 1, Math.floor((i * degs.length) / len))]!);
+  return out;
+}
+
+/** Two resampled phrases are "the same" if they align within ~1 step after transposition. */
+function phraseSimilar(a: number[], b: number[]): boolean {
+  const meanA = a.reduce((x, y) => x + y, 0) / a.length;
+  const meanB = b.reduce((x, y) => x + y, 0) / b.length;
+  const shift = Math.round(meanB - meanA);
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff += Math.abs(a[i]! + shift - b[i]!);
+  return diff / a.length <= 1.0;
+}
+
+/** Cluster phrase vectors greedily into labels A..D; over-cap or no-repeat => "TC". */
+function clusterForm(vecs: number[][]): string {
+  const clusters: number[][] = [];
+  const labels: string[] = [];
+  let overCap = false;
+  for (const v of vecs) {
+    let assigned = clusters.findIndex((c) => phraseSimilar(c, v));
+    if (assigned === -1) {
+      if (clusters.length >= 4) { overCap = true; labels.push("?"); continue; }
+      clusters.push(v);
+      assigned = clusters.length - 1;
+    }
+    labels.push(String.fromCharCode(65 + assigned));
+  }
+  const distinct = new Set(labels);
+  if (overCap || distinct.size === labels.length) return "TC";
+  return labels.join("");
+}
+
+/** Round a bar count to the nearest even value in 2..8. */
+function normBars(b: number): number {
+  return Math.min(8, Math.max(2, Math.round(b / 2) * 2));
+}
+
+// form signature -> aggregated template
+const formCounts = new Map<string, { form: string; barsPerPhrase: number[]; weight: number }>();
+
+function accumulateForm(body: string, key: Key): void {
+  const phrases = groupPhrases(splitMeasures(cleanBody(body)));
+  if (phrases.length < 2 || phrases.length > 8) return;
+  const vecs = phrases.map((p) => resample(extractDegrees(p.text, key)));
+  if (vecs.some((v) => v.every((d) => d === 0))) return; // a phrase with no notes
+  const form = clusterForm(vecs);
+  const barsPerPhrase = phrases.map((p) => normBars(p.bars));
+  const total = barsPerPhrase.reduce((a, b) => a + b, 0);
+  if (total < 12 || total > 32) return;
+  const sig = `${form}:${barsPerPhrase.join("-")}`;
+  const e = formCounts.get(sig) ?? { form, barsPerPhrase, weight: 0 };
+  e.weight++;
+  formCounts.set(sig, e);
+}
+
 // ---------- corpus accumulation ----------
 
 // Raw count tables (7 scale degrees)
@@ -174,7 +299,18 @@ function accumulateTune(tune: string): boolean {
     trigrams[degrees[i - 2]!]![degrees[i - 1]!]![degrees[i]!]!++;
   }
 
+  accumulateForm(body, key);
+
   return true;
+}
+
+/** Top-N aggregated form templates, deterministically sorted. */
+function buildFormTemplates(limit = 40): FormTemplate[] {
+  const templates = [...formCounts.values()]
+    .map((e) => ({ ...e, totalBars: e.barsPerPhrase.reduce((a, b) => a + b, 0) }))
+    .sort((a, b) => b.weight - a.weight || a.form.localeCompare(b.form) || a.totalBars - b.totalBars)
+    .slice(0, limit);
+  return templates.length > 0 ? templates : FALLBACK_TEMPLATES;
 }
 
 // ---------- download + process ----------
@@ -208,9 +344,19 @@ async function main(): Promise<void> {
     totalTunes += count;
   }
 
+  const outPath = join(__dirname, "..", "src", "compose", "corpus-data.json");
+
   if (totalTunes === 0) {
-    console.error("No tunes processed. Check network access or source URLs.");
-    process.exit(1);
+    // No network: preserve the committed melodic tables, only ensure the
+    // form-template catalog exists (hand-authored fallback).
+    console.error("No tunes processed (no network?). Preserving existing tables, adding fallback form templates.");
+    const existing = JSON.parse(readFileSync(outPath, "utf8")) as {
+      bigrams: number[][]; trigrams: number[][][]; formTemplates?: FormTemplate[];
+    };
+    existing.formTemplates = existing.formTemplates?.length ? existing.formTemplates : FALLBACK_TEMPLATES;
+    writeFileSync(outPath, JSON.stringify(existing));
+    console.log(`Wrote ${outPath} (fallback form templates: ${existing.formTemplates.length})`);
+    return;
   }
 
   // Count total degree observations from bigrams
@@ -234,11 +380,11 @@ async function main(): Promise<void> {
     })
   );
 
-  const out = { bigrams: bigramProb, trigrams: trigramProb };
-  const outPath = join(__dirname, "..", "src", "compose", "corpus-data.json");
+  const formTemplates = buildFormTemplates();
+  const out = { bigrams: bigramProb, trigrams: trigramProb, formTemplates };
   writeFileSync(outPath, JSON.stringify(out));
   console.log(`Wrote ${outPath}`);
-  console.log(`Table size: bigrams 7×7, trigrams 7×7×7`);
+  console.log(`Table size: bigrams 7×7, trigrams 7×7×7, form templates: ${formTemplates.length}`);
 }
 
 main().catch((e: unknown) => {

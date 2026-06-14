@@ -123,6 +123,41 @@ describe("score validity", () => {
   });
 });
 
+describe("song structure", () => {
+  it("loop length stays within the corpus template bounds (12..32 bars)", () => {
+    for (const ch of characters) {
+      for (const mood of MOODS) {
+        const score = composeScore(ch, mood);
+        expect(score.loopBars).toBeGreaterThanOrEqual(12);
+        expect(score.loopBars).toBeLessThanOrEqual(32);
+      }
+    }
+  });
+
+  it("structure varies across moods for one character (not a single fixed form)", () => {
+    const ch = characters[0]!;
+    const forms = MOODS.map((m) => {
+      const s = composeScore(ch, m);
+      return `${s.loopBars}:${s.tracks.map((t) => t.name).sort().join(",")}`;
+    });
+    expect(new Set(forms).size).toBeGreaterThanOrEqual(2);
+  });
+
+  it("two characters in the same mood can differ in structure (keyed by subject)", () => {
+    expect(characters.length).toBeGreaterThanOrEqual(2);
+    // Across the fixture set, at least one mood produces a differing macro-form
+    // (loop length or track layout) between two characters.
+    const differs = MOODS.some((mood) => {
+      const sigs = characters.map((ch) => {
+        const s = composeScore(ch, mood);
+        return `${s.loopBars}:${s.tracks.map((t) => t.name).sort().join(",")}`;
+      });
+      return new Set(sigs).size > 1;
+    });
+    expect(differs).toBe(true);
+  });
+});
+
 describe("melody quality", () => {
   it("corpus table: all bigram rows sum to 1", () => {
     for (let c = 0; c < 7; c++) {
