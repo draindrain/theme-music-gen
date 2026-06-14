@@ -31,7 +31,10 @@ export function registerProvider(p: MusicProvider): void {
 
 export function getProvider(name: string): MusicProvider {
   const p = providers.get(name);
-  if (!p) throw new Error(`Unknown api provider "${name}". Available: ${[...providers.keys()].join(", ")}`);
+  if (!p)
+    throw new Error(
+      `Unknown api provider "${name}". Available: ${[...providers.keys()].join(", ")}`,
+    );
   return p;
 }
 
@@ -45,7 +48,9 @@ export function derivePrompt(score: Score): string {
     playful: "bouncy, mischievous, light",
     melancholy: "wistful, bittersweet, reflective",
   };
-  const instruments = [...new Set(score.tracks.filter((t) => !t.isPercussion).map((t) => t.instrument))]
+  const instruments = [
+    ...new Set(score.tracks.filter((t) => !t.isPercussion).map((t) => t.instrument)),
+  ]
     .map((i) => i.replace(/_/g, " "))
     .join(", ");
   return (

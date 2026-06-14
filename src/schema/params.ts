@@ -8,13 +8,30 @@ import { z } from "zod";
 // ---------- shared enums ----------
 
 export const PITCH_CLASSES = [
-  "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B",
+  "C",
+  "Db",
+  "D",
+  "Eb",
+  "E",
+  "F",
+  "Gb",
+  "G",
+  "Ab",
+  "A",
+  "Bb",
+  "B",
 ] as const;
 export const PitchClassSchema = z.enum(PITCH_CLASSES);
 export type PitchClass = z.infer<typeof PitchClassSchema>;
 
 export const MODES = [
-  "lydian", "ionian", "mixolydian", "dorian", "aeolian", "harmonic_minor", "phrygian",
+  "lydian",
+  "ionian",
+  "mixolydian",
+  "dorian",
+  "aeolian",
+  "harmonic_minor",
+  "phrygian",
 ] as const;
 export const ModeSchema = z.enum(MODES);
 export type Mode = z.infer<typeof ModeSchema>;
@@ -40,9 +57,24 @@ export const RhythmFeelSchema = z.enum(RHYTHM_FEELS);
 export type RhythmFeel = z.infer<typeof RhythmFeelSchema>;
 
 export const INSTRUMENTS = [
-  "piano", "electric_piano", "music_box", "celesta", "harp", "acoustic_guitar",
-  "pluck", "marimba", "vibraphone", "flute", "clarinet", "oboe",
-  "strings", "cello", "warm_pad", "bright_pad", "soft_choir", "bells",
+  "piano",
+  "electric_piano",
+  "music_box",
+  "celesta",
+  "harp",
+  "acoustic_guitar",
+  "pluck",
+  "marimba",
+  "vibraphone",
+  "flute",
+  "clarinet",
+  "oboe",
+  "strings",
+  "cello",
+  "warm_pad",
+  "bright_pad",
+  "soft_choir",
+  "bells",
 ] as const;
 export const InstrumentSchema = z.enum(INSTRUMENTS);
 export type Instrument = z.infer<typeof InstrumentSchema>;
@@ -88,8 +120,15 @@ export type CharacterParams = z.infer<typeof CharacterParamsSchema>;
 // ---------- location / ambience ----------
 
 export const TEXTURES = [
-  "rain", "wind", "crowd_murmur", "night_insects", "water_stream",
-  "room_tone", "fire", "seaside", "city_hum",
+  "rain",
+  "wind",
+  "crowd_murmur",
+  "night_insects",
+  "water_stream",
+  "room_tone",
+  "fire",
+  "seaside",
+  "city_hum",
 ] as const;
 export const TextureSchema = z.enum(TEXTURES);
 export type Texture = z.infer<typeof TextureSchema>;
@@ -99,8 +138,18 @@ export const LayerLevelSchema = z.enum(LAYER_LEVELS);
 export type LayerLevel = z.infer<typeof LayerLevelSchema>;
 
 export const EVENT_TYPES = [
-  "droplets", "clinks", "birds", "owl", "frogs", "creaks",
-  "chimes", "distant_thunder", "footsteps", "pages", "crickets_chirp", "gull",
+  "droplets",
+  "clinks",
+  "birds",
+  "owl",
+  "frogs",
+  "creaks",
+  "chimes",
+  "distant_thunder",
+  "footsteps",
+  "pages",
+  "crickets_chirp",
+  "gull",
 ] as const;
 export const EventTypeSchema = z.enum(EVENT_TYPES);
 export type AmbEventType = z.infer<typeof EventTypeSchema>;
@@ -123,9 +172,7 @@ export const LocationParamsSchema = z
       .array(z.object({ texture: TextureSchema, level: LayerLevelSchema }).strict())
       .min(1)
       .max(3),
-    events: z
-      .array(z.object({ type: EventTypeSchema, density: DensitySchema }).strict())
-      .max(3),
+    events: z.array(z.object({ type: EventTypeSchema, density: DensitySchema }).strict()).max(3),
     brightness: BrightnessSchema,
     space: SpaceSchema,
   })

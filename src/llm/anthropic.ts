@@ -16,7 +16,8 @@ export const anthropicProvider: ParamLlmProvider = {
   name: "anthropic",
   async generate(req: ParamGenRequest): Promise<unknown> {
     const { default: Anthropic } = await import("@anthropic-ai/sdk");
-    const client = (req.client as InstanceType<typeof Anthropic>) ?? new Anthropic({ apiKey: req.apiKey });
+    const client =
+      (req.client as InstanceType<typeof Anthropic>) ?? new Anthropic({ apiKey: req.apiKey });
 
     const resp = await client.messages.create(
       {
@@ -30,11 +31,14 @@ export const anthropicProvider: ParamLlmProvider = {
 
     if (resp.stop_reason === "refusal") throw new Error("Anthropic declined the request (refusal)");
     const text = resp.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-    if (!text) throw new Error(`Anthropic returned no text (stop_reason=${resp.stop_reason ?? "unknown"})`);
+    if (!text)
+      throw new Error(`Anthropic returned no text (stop_reason=${resp.stop_reason ?? "unknown"})`);
     try {
       return JSON.parse(text);
     } catch (e) {
-      throw new Error(`Anthropic response was not valid JSON: ${(e as Error).message}`, { cause: e });
+      throw new Error(`Anthropic response was not valid JSON: ${(e as Error).message}`, {
+        cause: e,
+      });
     }
   },
 };

@@ -21,15 +21,20 @@ export function fft(re: Float64Array, im: Float64Array): void {
   }
   for (let len = 2; len <= n; len <<= 1) {
     const ang = (-2 * Math.PI) / len;
-    const wr = Math.cos(ang), wi = Math.sin(ang);
+    const wr = Math.cos(ang),
+      wi = Math.sin(ang);
     for (let i = 0; i < n; i += len) {
-      let cwr = 1, cwi = 0;
+      let cwr = 1,
+        cwi = 0;
       for (let k = 0; k < len / 2; k++) {
-        const ur = re[i + k]!, ui = im[i + k]!;
+        const ur = re[i + k]!,
+          ui = im[i + k]!;
         const vr = re[i + k + len / 2]! * cwr - im[i + k + len / 2]! * cwi;
         const vi = re[i + k + len / 2]! * cwi + im[i + k + len / 2]! * cwr;
-        re[i + k] = ur + vr; im[i + k] = ui + vi;
-        re[i + k + len / 2] = ur - vr; im[i + k + len / 2] = ui - vi;
+        re[i + k] = ur + vr;
+        im[i + k] = ui + vi;
+        re[i + k + len / 2] = ur - vr;
+        im[i + k + len / 2] = ui - vi;
         const nwr = cwr * wr - cwi * wi;
         cwi = cwr * wi + cwi * wr;
         cwr = nwr;
@@ -138,8 +143,12 @@ export function detectTempo(buf: AudioBuf): TempoEstimate {
   const meanWin = Math.round((sr / hop) * 0.5);
   const smoothed = new Float64Array(nFrames);
   for (let f = 0; f < nFrames; f++) {
-    let s = 0, c = 0;
-    for (let g = Math.max(0, f - meanWin); g < Math.min(nFrames, f + meanWin); g++) { s += onset[g]!; c++; }
+    let s = 0,
+      c = 0;
+    for (let g = Math.max(0, f - meanWin); g < Math.min(nFrames, f + meanWin); g++) {
+      s += onset[g]!;
+      c++;
+    }
     smoothed[f] = Math.max(0, onset[f]! - s / c);
   }
   smoothed.forEach((v, i) => (onset[i] = v));
@@ -156,13 +165,18 @@ export function detectTempo(buf: AudioBuf): TempoEstimate {
   // off-grid subdivisions are not
   const minLag = Math.floor((60 / 200) * frameRate);
   const maxLag = Math.ceil((60 / 50) * frameRate);
-  let bestLag = minLag, bestVal = -Infinity;
+  let bestLag = minLag,
+    bestVal = -Infinity;
   const scores: number[] = [];
   for (let lag = minLag; lag <= maxLag && lag * 2 <= maxAcfLag; lag++) {
     let val = acf[lag]!;
-    for (const [mult, w] of [[2, 0.6], [3, 0.4]] as const) {
+    for (const [mult, w] of [
+      [2, 0.6],
+      [3, 0.4],
+    ] as const) {
       const l = lag * mult;
-      if (l <= maxAcfLag) val += w * Math.max(acf[l - 1]!, acf[l]!, acf[Math.min(l + 1, maxAcfLag)]!);
+      if (l <= maxAcfLag)
+        val += w * Math.max(acf[l - 1]!, acf[l]!, acf[Math.min(l + 1, maxAcfLag)]!);
     }
     scores.push(val);
     if (val > bestVal) {
@@ -217,10 +231,7 @@ export function loopSeamReport(buf: AudioBuf): SeamReport {
   for (let c = 0; c < 2; c++) {
     const x = buf.channels[c]!;
     boundaryJump = Math.max(boundaryJump, Math.abs(x[0]! - x[n - 1]!));
-    slopeJump = Math.max(
-      slopeJump,
-      Math.abs((x[1]! - x[0]!) - (x[n - 1]! - x[n - 2]!)),
-    );
+    slopeJump = Math.max(slopeJump, Math.abs(x[1]! - x[0]! - (x[n - 1]! - x[n - 2]!)));
     // context: first differences in the windows touching the seam,
     // excluding the junction itself
     const deltas: number[] = [];

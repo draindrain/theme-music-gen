@@ -14,7 +14,8 @@ export const groqProvider: ParamLlmProvider = {
   name: "groq",
   async generate(req: ParamGenRequest): Promise<unknown> {
     const { default: OpenAI } = await import("openai");
-    const client = (req.client as InstanceType<typeof OpenAI>) ??
+    const client =
+      (req.client as InstanceType<typeof OpenAI>) ??
       new OpenAI({ apiKey: req.apiKey, baseURL: GROQ_BASE_URL });
 
     const strict = modelInfo("groq", req.model)?.strictJsonSchema ?? false;

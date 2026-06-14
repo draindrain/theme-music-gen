@@ -9,7 +9,11 @@ import { composeScore } from "./compose/arrange.ts";
 import { scoreToMidi } from "./score/midi.ts";
 import type { Score } from "./score/types.ts";
 import {
-  MOODS, type CharacterParams, type Description, type LocationParams, type Mood,
+  MOODS,
+  type CharacterParams,
+  type Description,
+  type LocationParams,
+  type Mood,
   type Params,
 } from "./schema/params.ts";
 import { finalizeLoop, haveBinary, type FinalizeResult } from "./post/post.ts";
@@ -91,7 +95,8 @@ export async function renderMusicAsset(
 
   const { audio, loop } = await backend.render(score, { sampleRate: SAMPLE_RATE });
   const outBase = join(dir, `${params.id}-${mood}.${backendName}`);
-  const loopOpt = loop.kind === "wrap" ? { loopSamples: loop.loopSamples } : { crossfadeSec: loop.fadeSec };
+  const loopOpt =
+    loop.kind === "wrap" ? { loopSamples: loop.loopSamples } : { crossfadeSec: loop.fadeSec };
   const result = finalizeLoop(audio, outBase, { ...loopOpt, ogg: formats.includes("ogg") });
 
   const asset: MusicAsset = {
@@ -194,9 +199,13 @@ export async function renderSet(
   // Validate consistency and availability up front, before doing any work.
   for (const { description, params } of items) {
     if (params.kind !== description.kind)
-      throw new RenderRequestError(`params kind "${params.kind}" does not match description kind "${description.kind}" for "${description.id}"`);
+      throw new RenderRequestError(
+        `params kind "${params.kind}" does not match description kind "${description.kind}" for "${description.id}"`,
+      );
     if (params.id !== description.id)
-      throw new RenderRequestError(`params id "${params.id}" does not match description id "${description.id}"`);
+      throw new RenderRequestError(
+        `params id "${params.id}" does not match description id "${description.id}"`,
+      );
   }
   const hasCharacters = items.some((i) => i.description.kind === "character");
   if (hasCharacters && backends.length === 0)
@@ -206,13 +215,18 @@ export async function renderSet(
     if (!avail.ok) throw new RenderRequestError(`backend "${name}" unavailable: ${avail.reason}`);
   }
   if (formats.includes("ogg") && !haveBinary("ffmpeg"))
-    throw new RenderRequestError('OGG output requires ffmpeg, which was not found on PATH. Deselect "ogg" or install ffmpeg.');
+    throw new RenderRequestError(
+      'OGG output requires ffmpeg, which was not found on PATH. Deselect "ogg" or install ffmpeg.',
+    );
 
   for (const { description, params } of items) {
     if (description.kind === "character" && params.kind === "character") {
       const dir = join(outDir, "music", description.id);
       mkdirSync(dir, { recursive: true });
-      writeFileSync(join(dir, `${description.id}.json`), JSON.stringify(description, null, 2) + "\n");
+      writeFileSync(
+        join(dir, `${description.id}.json`),
+        JSON.stringify(description, null, 2) + "\n",
+      );
       for (const mood of moods)
         for (const backend of backends) {
           const { asset } = await renderMusicAsset(params, mood, backend, outDir, { formats });
@@ -221,7 +235,10 @@ export async function renderSet(
     } else if (description.kind === "location" && params.kind === "location") {
       const dir = join(outDir, "ambience");
       mkdirSync(dir, { recursive: true });
-      writeFileSync(join(dir, `${description.id}.json`), JSON.stringify(description, null, 2) + "\n");
+      writeFileSync(
+        join(dir, `${description.id}.json`),
+        JSON.stringify(description, null, 2) + "\n",
+      );
       const { asset } = await renderAmbienceAsset(params, outDir, { formats });
       options.onProgress?.(asset);
     }

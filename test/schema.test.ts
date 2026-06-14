@@ -2,7 +2,10 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  ParamValidationError, parseCharacterParams, parseLocationParams, parseParams,
+  ParamValidationError,
+  parseCharacterParams,
+  parseLocationParams,
+  parseParams,
 } from "../src/schema/params.ts";
 import { characterPrompt, locationPrompt } from "../src/schema/prompt.ts";
 import { parseDescription } from "../src/schema/params.ts";
@@ -15,21 +18,28 @@ function loadJson(p: string): unknown {
 
 describe("parameter schema", () => {
   it("accepts every shipped character fixture", () => {
-    for (const f of readdirSync(join(FIXTURES, "characters")).filter((f) => f.endsWith(".params.json"))) {
+    for (const f of readdirSync(join(FIXTURES, "characters")).filter((f) =>
+      f.endsWith(".params.json"),
+    )) {
       const p = parseCharacterParams(loadJson(join(FIXTURES, "characters", f)), f);
       expect(p.kind).toBe("character");
     }
   });
 
   it("accepts every shipped location fixture", () => {
-    for (const f of readdirSync(join(FIXTURES, "locations")).filter((f) => f.endsWith(".params.json"))) {
+    for (const f of readdirSync(join(FIXTURES, "locations")).filter((f) =>
+      f.endsWith(".params.json"),
+    )) {
       const p = parseLocationParams(loadJson(join(FIXTURES, "locations", f)), f);
       expect(p.kind).toBe("location");
     }
   });
 
   it("rejects out-of-enum values with a typed error, never a silent pass", () => {
-    const good = loadJson(join(FIXTURES, "characters", "elara.params.json")) as Record<string, unknown>;
+    const good = loadJson(join(FIXTURES, "characters", "elara.params.json")) as Record<
+      string,
+      unknown
+    >;
     const bad = { ...good, baseTempo: "extremely_fast" };
     expect(() => parseParams(bad, "test")).toThrowError(ParamValidationError);
     try {
@@ -41,7 +51,10 @@ describe("parameter schema", () => {
   });
 
   it("rejects unknown extra fields (strict schemas)", () => {
-    const good = loadJson(join(FIXTURES, "characters", "elara.params.json")) as Record<string, unknown>;
+    const good = loadJson(join(FIXTURES, "characters", "elara.params.json")) as Record<
+      string,
+      unknown
+    >;
     expect(() => parseParams({ ...good, swagger: 11 }, "test")).toThrowError(ParamValidationError);
   });
 

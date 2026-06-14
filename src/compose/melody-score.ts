@@ -10,12 +10,18 @@ import { degreeClass } from "../theory/theory.ts";
 /** Target melodic shape (in degrees) at phrase position t in [0,1]. */
 export function contourTarget(contour: Contour, t: number): number {
   switch (contour) {
-    case "rising":  return -1 + 7 * t;
-    case "falling": return 6 - 7 * t;
-    case "arch":    return 6 * Math.sin(Math.PI * t);
-    case "valley":  return 4 - 6 * Math.sin(Math.PI * t);
-    case "wave":    return 3 * Math.sin(2 * Math.PI * t);
-    case "static":  return 0.8 * Math.sin(3 * Math.PI * t);
+    case "rising":
+      return -1 + 7 * t;
+    case "falling":
+      return 6 - 7 * t;
+    case "arch":
+      return 6 * Math.sin(Math.PI * t);
+    case "valley":
+      return 4 - 6 * Math.sin(Math.PI * t);
+    case "wave":
+      return 3 * Math.sin(2 * Math.PI * t);
+    case "static":
+      return 0.8 * Math.sin(3 * Math.PI * t);
   }
 }
 
@@ -82,7 +88,9 @@ function contourFitScore(degrees: number[], onsets: number[], contour: Contour):
   const meanDeg = degrees.reduce((a, b) => a + b, 0) / n;
   const meanTgt = targets.reduce((a, b) => a + b, 0) / n;
 
-  let num = 0, varD = 0, varT = 0;
+  let num = 0,
+    varD = 0,
+    varT = 0;
   for (let i = 0; i < n; i++) {
     const dd = degrees[i]! - meanDeg;
     const dt = targets[i]! - meanTgt;
@@ -100,9 +108,10 @@ function contourFitScore(degrees: number[], onsets: number[], contour: Contour):
  */
 function tonicGrounding(degrees: number[], onsets: number[]): number {
   const CHORD = new Set([0, 2, 4]);
-  let strong = 0, grounded = 0;
+  let strong = 0,
+    grounded = 0;
   for (let i = 0; i < degrees.length; i++) {
-    if ((onsets[i]! % 2) !== 0) continue;
+    if (onsets[i]! % 2 !== 0) continue;
     strong++;
     if (CHORD.has(degreeClass(degrees[i]!))) grounded++;
   }
@@ -112,10 +121,10 @@ function tonicGrounding(degrees: number[], onsets: number[]): number {
 /** Combined quality score for a complete theme. Higher is better. */
 export function scoreTheme(theme: Theme, contour: Contour): number {
   return (
-    corpusLogLikelihood(theme.degrees)                              * 1.0 +
-    leapResolutionRatio(theme.degrees)                              * 3.0 +
-    motivicRepetitionCount(theme.degrees)                           * 2.0 +
-    contourFitScore(theme.degrees, theme.onsets, contour)           * 1.0 +
-    tonicGrounding(theme.degrees, theme.onsets)                     * 1.5
+    corpusLogLikelihood(theme.degrees) * 1.0 +
+    leapResolutionRatio(theme.degrees) * 3.0 +
+    motivicRepetitionCount(theme.degrees) * 2.0 +
+    contourFitScore(theme.degrees, theme.onsets, contour) * 1.0 +
+    tonicGrounding(theme.degrees, theme.onsets) * 1.5
   );
 }

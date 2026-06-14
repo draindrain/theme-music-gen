@@ -5,21 +5,38 @@
  */
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { generateParams, registerParamProvider, type ParamLlmProvider } from "../src/index.ts";
 import {
-  generateParams, registerParamProvider, type ParamLlmProvider,
-} from "../src/index.ts";
-import { CharacterParamsLlmSchema, LocationParamsLlmSchema, toJsonSchema } from "../src/llm/schema.ts";
+  CharacterParamsLlmSchema,
+  LocationParamsLlmSchema,
+  toJsonSchema,
+} from "../src/llm/schema.ts";
 import { anthropicProvider } from "../src/llm/anthropic.ts";
 import { groqProvider } from "../src/llm/groq.ts";
 import { chooseParamsMode } from "../src/cli/main.ts";
 import { ParamValidationError, type Description } from "../src/schema/params.ts";
 
-const charDesc: Description = { kind: "character", id: "test", name: "Test", description: "a hero" };
-const locDesc: Description = { kind: "location", id: "place", name: "Place", description: "a cave" };
+const charDesc: Description = {
+  kind: "character",
+  id: "test",
+  name: "Test",
+  description: "a hero",
+};
+const locDesc: Description = {
+  kind: "location",
+  id: "place",
+  name: "Place",
+  description: "a cave",
+};
 
 const validCharFields = {
-  key: { tonic: "C", mode: "ionian" }, baseTempo: "medium", contour: "arch",
-  intervals: "stepwise", rhythm: "even", brightness: "neutral", weight: "medium",
+  key: { tonic: "C", mode: "ionian" },
+  baseTempo: "medium",
+  contour: "arch",
+  intervals: "stepwise",
+  rhythm: "even",
+  brightness: "neutral",
+  weight: "medium",
   palette: { lead: "piano", harmony: "strings", bass: "cello", pad: "warm_pad" },
 };
 
@@ -28,7 +45,9 @@ function sequenceProvider(name: string, ...returns: unknown[]): void {
   let i = 0;
   const p: ParamLlmProvider = {
     name,
-    async generate() { return returns[Math.min(i++, returns.length - 1)]; },
+    async generate() {
+      return returns[Math.min(i++, returns.length - 1)];
+    },
   };
   registerParamProvider(p);
 }
@@ -36,7 +55,11 @@ function sequenceProvider(name: string, ...returns: unknown[]): void {
 describe("generateParams orchestrator", () => {
   it("merges our schemaVersion/kind/id/seed and validates (character)", async () => {
     const params = await generateParams({
-      providerName: "mock", model: "x", apiKey: "", desc: charDesc, seed: 42,
+      providerName: "mock",
+      model: "x",
+      apiKey: "",
+      desc: charDesc,
+      seed: 42,
     });
     expect(params.kind).toBe("character");
     expect(params.id).toBe("test");
@@ -46,7 +69,11 @@ describe("generateParams orchestrator", () => {
 
   it("works for locations too", async () => {
     const params = await generateParams({
-      providerName: "mock", model: "x", apiKey: "", desc: locDesc, seed: 7,
+      providerName: "mock",
+      model: "x",
+      apiKey: "",
+      desc: locDesc,
+      seed: 7,
     });
     expect(params.kind).toBe("location");
     expect(params.id).toBe("place");
@@ -55,7 +82,11 @@ describe("generateParams orchestrator", () => {
   it("uses our id/seed, not anything the model emits", async () => {
     sequenceProvider("seq-spoof", { ...validCharFields, id: "evil", seed: 999, schemaVersion: 7 });
     const params = await generateParams({
-      providerName: "seq-spoof", model: "x", apiKey: "", desc: charDesc, seed: 123,
+      providerName: "seq-spoof",
+      model: "x",
+      apiKey: "",
+      desc: charDesc,
+      seed: 123,
     });
     expect(params.id).toBe("test");
     expect(params.seed).toBe(123);
@@ -65,7 +96,11 @@ describe("generateParams orchestrator", () => {
   it("retries once with feedback when the first answer is invalid", async () => {
     sequenceProvider("seq-retry", { ...validCharFields, baseTempo: "warp_speed" }, validCharFields);
     const params = await generateParams({
-      providerName: "seq-retry", model: "x", apiKey: "", desc: charDesc, seed: 1,
+      providerName: "seq-retry",
+      model: "x",
+      apiKey: "",
+      desc: charDesc,
+      seed: 1,
     });
     expect(params.kind).toBe("character");
   });
@@ -86,7 +121,12 @@ describe("toJsonSchema strict subset", () => {
     expect(text).not.toContain("minItems");
     expect(text).not.toContain("maxItems");
     expect(js["additionalProperties"]).toBe(false);
-    expect((js["required"] as string[]).sort()).toEqual(["brightness", "events", "layers", "space"]);
+    expect((js["required"] as string[]).sort()).toEqual([
+      "brightness",
+      "events",
+      "layers",
+      "space",
+    ]);
   });
 
   it("keeps enums for character fields", () => {
@@ -100,15 +140,23 @@ describe("groqProvider with injected client", () => {
   it("sends strict json_schema for a strict-capable model", async () => {
     let sent: Record<string, unknown> | undefined;
     const fake = {
-      chat: { completions: { create: async (body: Record<string, unknown>) => {
-        sent = body;
-        return { choices: [{ message: { content: JSON.stringify(validCharFields) } }] };
-      } } },
+      chat: {
+        completions: {
+          create: async (body: Record<string, unknown>) => {
+            sent = body;
+            return { choices: [{ message: { content: JSON.stringify(validCharFields) } }] };
+          },
+        },
+      },
     };
     const out = await groqProvider.generate({
-      kind: "character", prompt: "p", zodSchema: CharacterParamsLlmSchema,
+      kind: "character",
+      prompt: "p",
+      zodSchema: CharacterParamsLlmSchema,
       jsonSchema: toJsonSchema(CharacterParamsLlmSchema, { strict: true }),
-      model: "openai/gpt-oss-120b", apiKey: "", client: fake,
+      model: "openai/gpt-oss-120b",
+      apiKey: "",
+      client: fake,
     });
     expect((sent!["response_format"] as { type: string }).type).toBe("json_schema");
     expect((out as typeof validCharFields).baseTempo).toBe("medium");
@@ -117,14 +165,23 @@ describe("groqProvider with injected client", () => {
   it("falls back to json_object for non-strict models", async () => {
     let sent: Record<string, unknown> | undefined;
     const fake = {
-      chat: { completions: { create: async (body: Record<string, unknown>) => {
-        sent = body;
-        return { choices: [{ message: { content: JSON.stringify(validCharFields) } }] };
-      } } },
+      chat: {
+        completions: {
+          create: async (body: Record<string, unknown>) => {
+            sent = body;
+            return { choices: [{ message: { content: JSON.stringify(validCharFields) } }] };
+          },
+        },
+      },
     };
     await groqProvider.generate({
-      kind: "character", prompt: "p", zodSchema: CharacterParamsLlmSchema,
-      jsonSchema: {}, model: "llama-3.3-70b-versatile", apiKey: "", client: fake,
+      kind: "character",
+      prompt: "p",
+      zodSchema: CharacterParamsLlmSchema,
+      jsonSchema: {},
+      model: "llama-3.3-70b-versatile",
+      apiKey: "",
+      client: fake,
     });
     expect((sent!["response_format"] as { type: string }).type).toBe("json_object");
   });
@@ -134,15 +191,24 @@ describe("anthropicProvider with injected client", () => {
   it("uses output_config.format json_schema and parses the text result", async () => {
     let sent: Record<string, unknown> | undefined;
     const fake = {
-      messages: { create: async (body: Record<string, unknown>) => {
-        sent = body;
-        return { content: [{ type: "text", text: JSON.stringify(validCharFields) }], stop_reason: "end_turn" };
-      } },
+      messages: {
+        create: async (body: Record<string, unknown>) => {
+          sent = body;
+          return {
+            content: [{ type: "text", text: JSON.stringify(validCharFields) }],
+            stop_reason: "end_turn",
+          };
+        },
+      },
     };
     const out = await anthropicProvider.generate({
-      kind: "character", prompt: "p", zodSchema: CharacterParamsLlmSchema,
+      kind: "character",
+      prompt: "p",
+      zodSchema: CharacterParamsLlmSchema,
       jsonSchema: toJsonSchema(CharacterParamsLlmSchema, { strict: true }),
-      model: "claude-sonnet-4-6", apiKey: "", client: fake,
+      model: "claude-sonnet-4-6",
+      apiKey: "",
+      client: fake,
     });
     const fmt = (sent!["output_config"] as { format: { type: string } }).format;
     expect(fmt.type).toBe("json_schema");
@@ -151,10 +217,17 @@ describe("anthropicProvider with injected client", () => {
 
   it("throws on a refusal stop_reason", async () => {
     const fake = { messages: { create: async () => ({ content: [], stop_reason: "refusal" }) } };
-    await expect(anthropicProvider.generate({
-      kind: "character", prompt: "p", zodSchema: CharacterParamsLlmSchema,
-      jsonSchema: {}, model: "claude-sonnet-4-6", apiKey: "", client: fake,
-    })).rejects.toThrow();
+    await expect(
+      anthropicProvider.generate({
+        kind: "character",
+        prompt: "p",
+        zodSchema: CharacterParamsLlmSchema,
+        jsonSchema: {},
+        model: "claude-sonnet-4-6",
+        apiKey: "",
+        client: fake,
+      }),
+    ).rejects.toThrow();
   });
 });
 
@@ -164,7 +237,9 @@ describe("chooseParamsMode", () => {
     expect(chooseParamsMode({ hasIngest: true, provider: "groq", isTTY: false })).toBe("ingest");
   });
   it("provider flag -> generate", () => {
-    expect(chooseParamsMode({ hasIngest: false, provider: "anthropic", isTTY: false })).toBe("generate");
+    expect(chooseParamsMode({ hasIngest: false, provider: "anthropic", isTTY: false })).toBe(
+      "generate",
+    );
   });
   it("interactive with no flags -> menu", () => {
     expect(chooseParamsMode({ hasIngest: false, isTTY: true })).toBe("menu");
@@ -178,9 +253,14 @@ describe("chooseParamsMode", () => {
 describe("reduced schemas", () => {
   it("accept valid fields", () => {
     expect(() => CharacterParamsLlmSchema.parse(validCharFields)).not.toThrow();
-    expect(() => LocationParamsLlmSchema.parse({
-      layers: [{ texture: "rain", level: "bg" }], events: [], brightness: "dark", space: "vast",
-    })).not.toThrow();
+    expect(() =>
+      LocationParamsLlmSchema.parse({
+        layers: [{ texture: "rain", level: "bg" }],
+        events: [],
+        brightness: "dark",
+        space: "vast",
+      }),
+    ).not.toThrow();
   });
   it("reject unknown enum values", () => {
     expect(() => z.object({}).parse(null)).toThrow(); // z import sanity

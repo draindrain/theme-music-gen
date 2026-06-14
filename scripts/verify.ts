@@ -6,7 +6,11 @@
 import { readFileSync } from "node:fs";
 import process from "node:process";
 import {
-  detectTempo, inKeyEnergyRatio, isEffectivelySilent, loopSeamReport, tempoMatches,
+  detectTempo,
+  inKeyEnergyRatio,
+  isEffectivelySilent,
+  loopSeamReport,
+  tempoMatches,
 } from "../src/analysis/analyze.ts";
 
 /** Below this beat-spectrum contrast a blind tempo estimate is noise. */
@@ -26,7 +30,15 @@ if (manifest.assets.length === 0) {
 
 let failures = 0;
 console.log(`verifying ${manifest.assets.length} assets in ${outDir}\n`);
-console.log("asset".padEnd(38), "dur(s)".padStart(7), "rms".padStart(7), "seam".padStart(6), "key%".padStart(6), "bpm".padStart(11), " result");
+console.log(
+  "asset".padEnd(38),
+  "dur(s)".padStart(7),
+  "rms".padStart(7),
+  "seam".padStart(6),
+  "key%".padStart(6),
+  "bpm".padStart(11),
+  " result",
+);
 
 for (const asset of manifest.assets) {
   const buf = decodeWav(readFileSync(asset.wav));
@@ -58,7 +70,10 @@ for (const asset of manifest.assets) {
     }
   }
 
-  const name = asset.type === "music" ? `${asset.subject}/${asset.mood} (${asset.backend})` : `ambience/${asset.location}`;
+  const name =
+    asset.type === "music"
+      ? `${asset.subject}/${asset.mood} (${asset.backend})`
+      : `ambience/${asset.location}`;
   const ok = problems.length === 0;
   if (!ok) failures++;
   console.log(
@@ -72,5 +87,9 @@ for (const asset of manifest.assets) {
   );
 }
 
-console.log(failures === 0 ? `\nall ${manifest.assets.length} assets verified.` : `\n${failures} asset(s) FAILED verification.`);
+console.log(
+  failures === 0
+    ? `\nall ${manifest.assets.length} assets verified.`
+    : `\n${failures} asset(s) FAILED verification.`,
+);
 process.exit(failures === 0 ? 0 : 1);

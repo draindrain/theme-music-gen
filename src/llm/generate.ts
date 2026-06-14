@@ -6,12 +6,13 @@
  * with the issues fed back to the model before giving up.
  */
 import {
-  parseParams, ParamValidationError, type Description, type Params,
+  parseParams,
+  ParamValidationError,
+  type Description,
+  type Params,
 } from "../schema/params.ts";
 import { characterPrompt, locationPrompt } from "../schema/prompt.ts";
-import {
-  getParamProvider, registerParamProvider, type ParamKind,
-} from "./types.ts";
+import { getParamProvider, registerParamProvider, type ParamKind } from "./types.ts";
 import { llmSchemaFor, toJsonSchema } from "./schema.ts";
 import { anthropicProvider } from "./anthropic.ts";
 import { groqProvider } from "./groq.ts";
@@ -36,12 +37,7 @@ function basePrompt(desc: Description, seed: number): string {
   return desc.kind === "character" ? characterPrompt(desc, seed) : locationPrompt(desc, seed);
 }
 
-function mergeAndValidate(
-  raw: unknown,
-  desc: Description,
-  seed: number,
-  source: string,
-): Params {
+function mergeAndValidate(raw: unknown, desc: Description, seed: number, source: string): Params {
   // Our fields come last so a model can't override the id/seed/kind we own.
   const full = {
     ...(raw as Record<string, unknown>),

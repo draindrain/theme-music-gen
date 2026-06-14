@@ -43,8 +43,11 @@ describe("web server", () => {
     const res = await fetch(`${base}/api/capabilities`);
     expect(res.status).toBe(200);
     const j = (await res.json()) as {
-      backends: { name: string; ok: boolean }[]; moods: string[];
-      models: { provider: string }[]; formats: string[]; haveFfmpeg: boolean;
+      backends: { name: string; ok: boolean }[];
+      moods: string[];
+      models: { provider: string }[];
+      formats: string[];
+      haveFfmpeg: boolean;
     };
     expect(j.backends.map((b) => b.name)).toContain("dsp");
     expect(j.moods).toContain("tense");
@@ -55,7 +58,10 @@ describe("web server", () => {
   it("seeds descriptions + params from fixtures", async () => {
     const res = await fetch(`${base}/api/seed`);
     expect(res.status).toBe(200);
-    const j = (await res.json()) as { descriptions: { id: string }[]; params: Record<string, unknown> };
+    const j = (await res.json()) as {
+      descriptions: { id: string }[];
+      params: Record<string, unknown>;
+    };
     expect(j.descriptions.map((d) => d.id)).toContain("nyx");
     expect(j.params.nyx).toBeTruthy();
   });
@@ -70,10 +76,17 @@ describe("web server", () => {
     const bad = await post("/api/validate", {
       kind: "params",
       content: {
-        schemaVersion: 1, kind: "character", id: "nyx", seed: 1,
+        schemaVersion: 1,
+        kind: "character",
+        id: "nyx",
+        seed: 1,
         key: { tonic: "H", mode: "dorian" }, // H is not a pitch class
-        baseTempo: "fast", contour: "wave", intervals: "leapy", rhythm: "syncopated",
-        brightness: "neutral", weight: "medium",
+        baseTempo: "fast",
+        contour: "wave",
+        intervals: "leapy",
+        rhythm: "syncopated",
+        brightness: "neutral",
+        weight: "medium",
         palette: { lead: "marimba", harmony: "pluck", bass: "acoustic_guitar", pad: "bright_pad" },
       },
     });
@@ -83,7 +96,12 @@ describe("web server", () => {
 
   it("builds a copy-paste prompt for a description", async () => {
     const res = await post("/api/prompt", {
-      description: { kind: "character", id: "elara", name: "Elara", description: "A gentle librarian." },
+      description: {
+        kind: "character",
+        id: "elara",
+        name: "Elara",
+        description: "A gentle librarian.",
+      },
     });
     expect(res.status).toBe(200);
     expect(((await res.json()) as { prompt: string }).prompt).toContain("elara");
@@ -91,15 +109,21 @@ describe("web server", () => {
 
   it("generates a job (dsp, wav, one mood), serves it, and rejects bad ids", async () => {
     const seed = (await (await fetch(`${base}/api/seed`)).json()) as {
-      descriptions: { id: string; kind: string }[]; params: Record<string, unknown>;
+      descriptions: { id: string; kind: string }[];
+      params: Record<string, unknown>;
     };
     const desc = seed.descriptions.find((d) => d.id === "nyx")!;
     const res = await post("/api/generate", {
       items: [{ description: desc, params: seed.params.nyx }],
-      moods: ["tense"], formats: ["wav"], backends: ["dsp"],
+      moods: ["tense"],
+      formats: ["wav"],
+      backends: ["dsp"],
     });
     expect(res.status).toBe(200);
-    const j = (await res.json()) as { job: string; manifest: { assets: { wav: string; mood?: string }[] } };
+    const j = (await res.json()) as {
+      job: string;
+      manifest: { assets: { wav: string; mood?: string }[] };
+    };
     expect(j.job).toMatch(/^[a-f0-9]{16,}$/);
     const asset = j.manifest.assets.find((a) => a.mood === "tense")!;
     expect(asset.wav).toContain("nyx-tense.dsp.wav");
@@ -121,12 +145,15 @@ describe("web server", () => {
     const { haveBinary } = await import("../src/post/post.ts");
     if (haveBinary("ffmpeg")) return; // only meaningful without ffmpeg
     const seed = (await (await fetch(`${base}/api/seed`)).json()) as {
-      descriptions: { id: string }[]; params: Record<string, unknown>;
+      descriptions: { id: string }[];
+      params: Record<string, unknown>;
     };
     const desc = seed.descriptions.find((d) => d.id === "nyx")!;
     const res = await post("/api/generate", {
       items: [{ description: desc, params: seed.params.nyx }],
-      moods: ["tense"], formats: ["wav", "ogg"], backends: ["dsp"],
+      moods: ["tense"],
+      formats: ["wav", "ogg"],
+      backends: ["dsp"],
     });
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toContain("ffmpeg");

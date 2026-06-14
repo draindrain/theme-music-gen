@@ -52,12 +52,27 @@ export function scoreToMidi(score: Score, opts: MidiOpts = {}): Buffer {
   // tempo/meta track
   const usPerBeat = Math.round(60_000_000 / score.tempoBpm);
   const metaEvents: Ev[] = [
-    { tick: 0, prio: 0, bytes: [0xff, 0x51, 0x03, (usPerBeat >> 16) & 0xff, (usPerBeat >> 8) & 0xff, usPerBeat & 0xff] },
+    {
+      tick: 0,
+      prio: 0,
+      bytes: [
+        0xff,
+        0x51,
+        0x03,
+        (usPerBeat >> 16) & 0xff,
+        (usPerBeat >> 8) & 0xff,
+        usPerBeat & 0xff,
+      ],
+    },
     { tick: 0, prio: 0, bytes: [0xff, 0x58, 0x04, score.beatsPerBar, 2, 24, 8] },
   ];
   if (opts.padToBeat !== undefined) {
     const txt = [...Buffer.from("pad")];
-    metaEvents.push({ tick: Math.round(opts.padToBeat * PPQ), prio: 2, bytes: [0xff, 0x01, txt.length, ...txt] });
+    metaEvents.push({
+      tick: Math.round(opts.padToBeat * PPQ),
+      prio: 2,
+      bytes: [0xff, 0x01, txt.length, ...txt],
+    });
   }
   chunks.push(trackChunk(metaEvents));
 
@@ -77,7 +92,11 @@ export function scoreToMidi(score: Score, opts: MidiOpts = {}): Buffer {
       const offTick = Math.round((note.startBeat + note.durBeats) * PPQ);
       const vel = Math.max(1, Math.min(127, Math.round(note.velocity * 127)));
       events.push({ tick: onTick, prio: 1, bytes: [0x90 | channel, note.midi & 0x7f, vel] });
-      events.push({ tick: Math.max(onTick + 1, offTick), prio: 0, bytes: [0x80 | channel, note.midi & 0x7f, 0] });
+      events.push({
+        tick: Math.max(onTick + 1, offTick),
+        prio: 0,
+        bytes: [0x80 | channel, note.midi & 0x7f, 0],
+      });
     }
     chunks.push(trackChunk(events));
   }

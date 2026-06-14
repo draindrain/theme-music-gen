@@ -56,7 +56,10 @@ export const soundfontBackend: SynthBackend = {
         ["-ni", "-g", "0.6", "-r", String(sr), "-F", wavPath, soundfontPath(), midPath],
         { stdio: ["ignore", "ignore", "pipe"] },
       );
-      const audio = fitLength(decodeWav(readFileSync(wavPath)), Math.round((loopSeconds(score) + TAIL_SEC) * sr));
+      const audio = fitLength(
+        decodeWav(readFileSync(wavPath)),
+        Math.round((loopSeconds(score) + TAIL_SEC) * sr),
+      );
       return { audio, loop: { kind: "wrap", loopSamples: Math.round(loopSeconds(score) * sr) } };
     } finally {
       rmSync(dir, { recursive: true, force: true });

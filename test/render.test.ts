@@ -5,15 +5,32 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { renderAmbience, ambienceLoopSamples, AMBIENCE_LOOP_SEC } from "../src/ambience/ambience.ts";
 import {
-  detectTempoBpm, inKeyEnergyRatio, isEffectivelySilent, loopSeamReport, tempoMatches,
+  renderAmbience,
+  ambienceLoopSamples,
+  AMBIENCE_LOOP_SEC,
+} from "../src/ambience/ambience.ts";
+import {
+  detectTempoBpm,
+  inKeyEnergyRatio,
+  isEffectivelySilent,
+  loopSeamReport,
+  tempoMatches,
 } from "../src/analysis/analyze.ts";
 import { bufLength } from "../src/audio/buffer.ts";
 import { composeScore } from "../src/compose/arrange.ts";
-import { crossfadeLoop, normalizeLoudness, rmsDb, wrapTailIntoLoop, TARGET_RMS_DB } from "../src/post/post.ts";
 import {
-  parseCharacterParams, parseLocationParams, type CharacterParams, type LocationParams,
+  crossfadeLoop,
+  normalizeLoudness,
+  rmsDb,
+  wrapTailIntoLoop,
+  TARGET_RMS_DB,
+} from "../src/post/post.ts";
+import {
+  parseCharacterParams,
+  parseLocationParams,
+  type CharacterParams,
+  type LocationParams,
 } from "../src/schema/params.ts";
 import { loopSeconds } from "../src/score/types.ts";
 import { derivePrompt, apiBackend } from "../src/synth/api/backend.ts";
@@ -25,16 +42,23 @@ const SR = 44100;
 
 function character(id: string): CharacterParams {
   return parseCharacterParams(
-    JSON.parse(readFileSync(join(FIXTURES, "characters", `${id}.params.json`), "utf8")), id);
+    JSON.parse(readFileSync(join(FIXTURES, "characters", `${id}.params.json`), "utf8")),
+    id,
+  );
 }
 function location(id: string): LocationParams {
   return parseLocationParams(
-    JSON.parse(readFileSync(join(FIXTURES, "locations", `${id}.params.json`), "utf8")), id);
+    JSON.parse(readFileSync(join(FIXTURES, "locations", `${id}.params.json`), "utf8")),
+    id,
+  );
 }
 
 describe("dsp backend", () => {
   // one light arrangement, one dense one with percussion
-  for (const [id, mood] of [["elara", "sad"], ["nyx", "happy"]] as const) {
+  for (const [id, mood] of [
+    ["elara", "sad"],
+    ["nyx", "happy"],
+  ] as const) {
     it(`renders ${id}/${mood}: duration, loudness, key, tempo, seam all verified`, async () => {
       const params = character(id);
       const score = composeScore(params, mood);

@@ -27,24 +27,124 @@ const THEME_BEATS = 8;
 /** Candidate rhythm cells per feel: [onset, duration][] over 8 beats. */
 const RHYTHM_PATTERNS: Record<RhythmFeel, [number, number][][]> = {
   even: [
-    [[0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1]],
-    [[0, 2], [2, 1], [3, 1], [4, 2], [6, 1], [7, 1]],
-    [[0, 1], [1, 1], [2, 2], [4, 1], [5, 1], [6, 2]],
+    [
+      [0, 1],
+      [1, 1],
+      [2, 1],
+      [3, 1],
+      [4, 1],
+      [5, 1],
+      [6, 1],
+      [7, 1],
+    ],
+    [
+      [0, 2],
+      [2, 1],
+      [3, 1],
+      [4, 2],
+      [6, 1],
+      [7, 1],
+    ],
+    [
+      [0, 1],
+      [1, 1],
+      [2, 2],
+      [4, 1],
+      [5, 1],
+      [6, 2],
+    ],
   ],
   dotted: [
-    [[0, 1.5], [1.5, 0.5], [2, 1], [3, 1], [4, 1.5], [5.5, 0.5], [6, 1], [7, 1]],
-    [[0, 1.5], [1.5, 0.5], [2, 2], [4, 1.5], [5.5, 0.5], [6, 2]],
-    [[0, 0.75], [0.75, 0.25], [1, 1], [2, 1.5], [3.5, 0.5], [4, 1], [5, 1], [6, 2]],
+    [
+      [0, 1.5],
+      [1.5, 0.5],
+      [2, 1],
+      [3, 1],
+      [4, 1.5],
+      [5.5, 0.5],
+      [6, 1],
+      [7, 1],
+    ],
+    [
+      [0, 1.5],
+      [1.5, 0.5],
+      [2, 2],
+      [4, 1.5],
+      [5.5, 0.5],
+      [6, 2],
+    ],
+    [
+      [0, 0.75],
+      [0.75, 0.25],
+      [1, 1],
+      [2, 1.5],
+      [3.5, 0.5],
+      [4, 1],
+      [5, 1],
+      [6, 2],
+    ],
   ],
   syncopated: [
-    [[0, 0.75], [1, 0.5], [1.5, 1], [3, 0.5], [3.5, 1], [4.5, 0.75], [5.5, 0.5], [6, 1.5]],
-    [[0, 1], [1.5, 0.5], [2, 0.75], [3.5, 1], [4.5, 0.5], [5, 1], [6.5, 1]],
-    [[0.5, 0.75], [1.5, 0.5], [2, 1], [3.5, 0.75], [4.5, 0.5], [5, 0.75], [6, 0.5], [6.5, 1]],
+    [
+      [0, 0.75],
+      [1, 0.5],
+      [1.5, 1],
+      [3, 0.5],
+      [3.5, 1],
+      [4.5, 0.75],
+      [5.5, 0.5],
+      [6, 1.5],
+    ],
+    [
+      [0, 1],
+      [1.5, 0.5],
+      [2, 0.75],
+      [3.5, 1],
+      [4.5, 0.5],
+      [5, 1],
+      [6.5, 1],
+    ],
+    [
+      [0.5, 0.75],
+      [1.5, 0.5],
+      [2, 1],
+      [3.5, 0.75],
+      [4.5, 0.5],
+      [5, 0.75],
+      [6, 0.5],
+      [6.5, 1],
+    ],
   ],
   flowing: [
-    [[0, 1], [1, 0.5], [1.5, 0.5], [2, 2], [4, 1], [5, 0.5], [5.5, 0.5], [6, 2]],
-    [[0, 0.5], [0.5, 0.5], [1, 1], [2, 1], [3, 1], [4, 2], [6, 2]],
-    [[0, 2], [2, 0.5], [2.5, 0.5], [3, 1], [4, 1], [5, 0.5], [5.5, 0.5], [6, 1.5]],
+    [
+      [0, 1],
+      [1, 0.5],
+      [1.5, 0.5],
+      [2, 2],
+      [4, 1],
+      [5, 0.5],
+      [5.5, 0.5],
+      [6, 2],
+    ],
+    [
+      [0, 0.5],
+      [0.5, 0.5],
+      [1, 1],
+      [2, 1],
+      [3, 1],
+      [4, 2],
+      [6, 2],
+    ],
+    [
+      [0, 2],
+      [2, 0.5],
+      [2.5, 0.5],
+      [3, 1],
+      [4, 1],
+      [5, 0.5],
+      [5.5, 0.5],
+      [6, 1.5],
+    ],
   ],
 };
 
@@ -96,23 +196,25 @@ function generateOnce(
 
         // --- corpus probability (soft nudge via sqrt; 4x advantage → 2x weight) ---
         const corpus =
-          prevPrev !== undefined
-            ? trigramWeight(prevPrev, prev, deg)
-            : bigramWeight(prev, deg);
+          prevPrev !== undefined ? trigramWeight(prevPrev, prev, deg) : bigramWeight(prev, deg);
         const corpusW = Math.sqrt(corpus);
 
         // --- duration bias: short notes can be passing tones, long notes want to be structural ---
         const stable = isStable(deg);
         const durationW =
-          dur < 0.5 ? (stable ? 0.6 : 1.6) :
-          dur >= 1.5 ? (stable ? 2.0 : 0.5) :
-          1.0;
+          dur < 0.5 ? (stable ? 0.6 : 1.6) : dur >= 1.5 ? (stable ? 2.0 : 0.5) : 1.0;
 
         // --- beat weight: strong beats (1,3,5,7) favour stable degrees ---
         const beatW =
-          onset % 1 !== 0 ? (stable ? 0.7 : 1.3) :   // offbeat
-          onset % 2 === 0 ? (stable ? 1.5 : 0.7) :   // strong beat
-          1.0;                                          // weak beat (2,4,6)
+          onset % 1 !== 0
+            ? stable
+              ? 0.7
+              : 1.3 // offbeat
+            : onset % 2 === 0
+              ? stable
+                ? 1.5
+                : 0.7 // strong beat
+              : 1.0; // weak beat (2,4,6)
 
         // --- motivic repetition: second half biases toward the opening cell ---
         let motifW = 1.0;
@@ -133,9 +235,7 @@ function generateOnce(
 
   // Snap last note to closest stable degree so the phrase can cadence cleanly
   const last = degrees[n - 1]!;
-  const stable = [0, 2, 4, 7].reduce((a, b) =>
-    Math.abs(b - last) < Math.abs(a - last) ? b : a
-  );
+  const stable = [0, 2, 4, 7].reduce((a, b) => (Math.abs(b - last) < Math.abs(a - last) ? b : a));
   degrees[n - 1] = stable;
 
   return {
@@ -154,11 +254,11 @@ export function generateTheme(params: CharacterParams): Theme {
   // Generate N candidates, each with its own deterministic RNG fork.
   // Same seed → same candidates → same winner every time.
   const candidates = Array.from({ length: CANDIDATES }, (_, c) =>
-    generateOnce(rng.fork(`cand${c}`), pattern, params)
+    generateOnce(rng.fork(`cand${c}`), pattern, params),
   );
 
   return candidates.reduce((best, cand) =>
-    scoreTheme(cand, params.contour) > scoreTheme(best, params.contour) ? cand : best
+    scoreTheme(cand, params.contour) > scoreTheme(best, params.contour) ? cand : best,
   );
 }
 
@@ -251,10 +351,18 @@ export function generateEpisode(theme: Theme, rng: Rng): Episode {
   const transform = rng.pick(["retrograde", "inversion", "sequence", "truncate"] as const);
   let episode: Episode;
   switch (transform) {
-    case "retrograde": episode = retrograde(theme); break;
-    case "inversion":  episode = inversion(theme); break;
-    case "sequence":   episode = sequence(theme); break;
-    case "truncate":   episode = truncateShift(theme, rng); break;
+    case "retrograde":
+      episode = retrograde(theme);
+      break;
+    case "inversion":
+      episode = inversion(theme);
+      break;
+    case "sequence":
+      episode = sequence(theme);
+      break;
+    case "truncate":
+      episode = truncateShift(theme, rng);
+      break;
   }
   return repairEpisode(episode);
 }

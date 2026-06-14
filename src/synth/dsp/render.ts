@@ -25,11 +25,16 @@ function midiToFreq(m: number): number {
 function oscSample(kind: string, phase: number): number {
   const p = phase - Math.floor(phase);
   switch (kind) {
-    case "sine": return Math.sin(TWO_PI * p);
-    case "triangle": return 4 * Math.abs(p - 0.5) - 1;
-    case "saw": return 2 * p - 1;
-    case "square": return p < 0.5 ? 0.7 : -0.7;
-    default: return Math.sin(TWO_PI * p);
+    case "sine":
+      return Math.sin(TWO_PI * p);
+    case "triangle":
+      return 4 * Math.abs(p - 0.5) - 1;
+    case "saw":
+      return 2 * p - 1;
+    case "square":
+      return p < 0.5 ? 0.7 : -0.7;
+    default:
+      return Math.sin(TWO_PI * p);
   }
 }
 
@@ -38,8 +43,13 @@ function oscSample(kind: string, phase: number): number {
  * Returns nothing; writes additively.
  */
 function renderNoteInto(
-  out: Float32Array, sampleRate: number, patch: Patch, note: Note,
-  startSample: number, durSec: number, rng: Rng,
+  out: Float32Array,
+  sampleRate: number,
+  patch: Patch,
+  note: Note,
+  startSample: number,
+  durSec: number,
+  rng: Rng,
 ): void {
   const freq = midiToFreq(note.midi);
   const { a, d, s, r } = patch.adsr;
@@ -130,8 +140,15 @@ function envAtHold(a: number, d: number, s: number, holdN: number, aN: number, d
 
 /** Karplus-Strong plucked string. */
 function renderKarplus(
-  out: Float32Array, sampleRate: number, patch: Patch, freq: number, amp: number,
-  startSample: number, n: number, holdSec: number, rng: Rng,
+  out: Float32Array,
+  sampleRate: number,
+  patch: Patch,
+  freq: number,
+  amp: number,
+  startSample: number,
+  n: number,
+  holdSec: number,
+  rng: Rng,
 ): void {
   const period = Math.max(2, Math.round(sampleRate / freq));
   const line = new Float32Array(period);
@@ -159,11 +176,16 @@ function renderKarplus(
 
 /** GM-drum-key percussion, synthesized. */
 function renderPercInto(
-  out: Float32Array, sampleRate: number, note: Note, startSample: number, rng: Rng,
+  out: Float32Array,
+  sampleRate: number,
+  note: Note,
+  startSample: number,
+  rng: Rng,
 ): void {
   const vel = note.velocity;
   switch (note.midi) {
-    case 36: { // kick: sine sweep 110 -> 45 Hz
+    case 36: {
+      // kick: sine sweep 110 -> 45 Hz
       const n = Math.min(Math.floor(0.16 * sampleRate), out.length - startSample);
       let phase = 0;
       for (let i = 0; i < n; i++) {
@@ -175,9 +197,11 @@ function renderPercInto(
       }
       break;
     }
-    case 37: { // rim: short band-noise tick
+    case 37: {
+      // rim: short band-noise tick
       const n = Math.min(Math.floor(0.04 * sampleRate), out.length - startSample);
-      let bp = 0, bp2 = 0;
+      let bp = 0,
+        bp2 = 0;
       const f = (TWO_PI * 1800) / sampleRate;
       for (let i = 0; i < n; i++) {
         const x = rng.next() * 2 - 1;
@@ -188,7 +212,8 @@ function renderPercInto(
       }
       break;
     }
-    case 42: { // closed hat: highpassed noise
+    case 42: {
+      // closed hat: highpassed noise
       const n = Math.min(Math.floor(0.06 * sampleRate), out.length - startSample);
       let lp = 0;
       for (let i = 0; i < n; i++) {
@@ -200,9 +225,11 @@ function renderPercInto(
       }
       break;
     }
-    default: { // 70 shaker (and anything else): soft band noise
+    default: {
+      // 70 shaker (and anything else): soft band noise
       const n = Math.min(Math.floor(0.09 * sampleRate), out.length - startSample);
-      let lp = 0, lp2 = 0;
+      let lp = 0,
+        lp2 = 0;
       for (let i = 0; i < n; i++) {
         const x = rng.next() * 2 - 1;
         lp = lp * 0.55 + x * 0.45;
@@ -281,8 +308,10 @@ export function renderScoreDsp(score: Score, opts: DspRenderOpts = {}): AudioBuf
     const panL = Math.cos(((track.pan + 1) / 4) * Math.PI);
     const panR = Math.sin(((track.pan + 1) / 4) * Math.PI);
     const send = track.isPercussion ? 0.06 : PATCHES[track.instrument].reverbSend;
-    const dl = dry.channels[0], dr = dry.channels[1];
-    const rl = revIn.channels[0], rr = revIn.channels[1];
+    const dl = dry.channels[0],
+      dr = dry.channels[1];
+    const rl = revIn.channels[0],
+      rr = revIn.channels[1];
     for (let i = 0; i < total; i++) {
       const v = mono[i]! * gain;
       dl[i]! += v * panL;
@@ -295,14 +324,20 @@ export function renderScoreDsp(score: Score, opts: DspRenderOpts = {}): AudioBuf
   const wet = schroederReverb(revIn, 1.0);
   const out = createBuf(sr, total);
   for (let c = 0; c < 2; c++) {
-    const o = out.channels[c]!, d = dry.channels[c]!, w = wet.channels[c]!;
+    const o = out.channels[c]!,
+      d = dry.channels[c]!,
+      w = wet.channels[c]!;
     for (let i = 0; i < total; i++) o[i] = d[i]! + w[i]!;
   }
   return out;
 }
 
 function renderTrackMono(
-  mono: Float32Array, sr: number, track: Track, secPerBeat: number, trackSeed: number,
+  mono: Float32Array,
+  sr: number,
+  track: Track,
+  secPerBeat: number,
+  trackSeed: number,
 ): void {
   const patch = track.isPercussion ? null : PATCHES[track.instrument];
   for (let ni = 0; ni < track.notes.length; ni++) {

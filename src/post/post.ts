@@ -91,7 +91,8 @@ export function normalizeLoudness(buf: AudioBuf, targetDb = TARGET_RMS_DB): Audi
   const out = createBuf(buf.sampleRate, bufLength(buf));
   if (peak <= ceiling) {
     for (let c = 0; c < 2; c++) {
-      const x = buf.channels[c]!, y = out.channels[c]!;
+      const x = buf.channels[c]!,
+        y = out.channels[c]!;
       for (let i = 0; i < x.length; i++) y[i] = x[i]! * gain;
     }
     return out;
@@ -100,7 +101,8 @@ export function normalizeLoudness(buf: AudioBuf, targetDb = TARGET_RMS_DB): Audi
   const knee = ceiling * 0.6;
   const range = ceiling - knee;
   for (let c = 0; c < 2; c++) {
-    const x = buf.channels[c]!, y = out.channels[c]!;
+    const x = buf.channels[c]!,
+      y = out.channels[c]!;
     for (let i = 0; i < x.length; i++) {
       const v = x[i]! * gain;
       const a = Math.abs(v);
@@ -138,8 +140,15 @@ export function writeWav(buf: AudioBuf, path: string): void {
 
 export function encodeOgg(wavPath: string, oggPath: string): void {
   if (!haveBinary("ffmpeg"))
-    throw new MissingToolError("ffmpeg", "Install it (e.g. `apt install ffmpeg` / `brew install ffmpeg` / `winget install Gyan.FFmpeg`) to get OGG output.");
-  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", wavPath, "-c:a", "libvorbis", "-q:a", "5", oggPath], { stdio: "inherit" });
+    throw new MissingToolError(
+      "ffmpeg",
+      "Install it (e.g. `apt install ffmpeg` / `brew install ffmpeg` / `winget install Gyan.FFmpeg`) to get OGG output.",
+    );
+  execFileSync(
+    "ffmpeg",
+    ["-y", "-loglevel", "error", "-i", wavPath, "-c:a", "libvorbis", "-q:a", "5", oggPath],
+    { stdio: "inherit" },
+  );
 }
 
 export interface FinalizeResult {
@@ -168,7 +177,12 @@ export function finalizeLoop(
   buf = normalizeLoudness(buf);
   const wavPath = `${outBase}.wav`;
   writeWav(buf, wavPath);
-  const base = { wavPath, rmsDb: rmsDb(buf), peakDb: peakDb(buf), seconds: bufLength(buf) / buf.sampleRate };
+  const base = {
+    wavPath,
+    rmsDb: rmsDb(buf),
+    peakDb: peakDb(buf),
+    seconds: bufLength(buf) / buf.sampleRate,
+  };
   if (opts.ogg === false) return base;
   const oggPath = `${outBase}.ogg`;
   encodeOgg(wavPath, oggPath);

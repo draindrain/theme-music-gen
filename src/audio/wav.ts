@@ -23,8 +23,10 @@ export function encodeWavPcm16(buf: AudioBuf): Buffer {
   let o = 44;
   const [l, r] = buf.channels;
   for (let i = 0; i < n; i++) {
-    out.writeInt16LE(floatToInt16(l[i]!), o); o += 2;
-    out.writeInt16LE(floatToInt16(r[i]!), o); o += 2;
+    out.writeInt16LE(floatToInt16(l[i]!), o);
+    o += 2;
+    out.writeInt16LE(floatToInt16(r[i]!), o);
+    o += 2;
   }
   return out;
 }
@@ -63,7 +65,7 @@ export function decodeWav(data: Buffer): AudioBuf {
   const read = (off: number): number => {
     if (format === 1 && bits === 16) return data.readInt16LE(off) / 0x8000;
     if (format === 1 && bits === 24) {
-      const v = (data[off]! | (data[off + 1]! << 8) | (data[off + 2]! << 16)) << 8 >> 8;
+      const v = ((data[off]! | (data[off + 1]! << 8) | (data[off + 2]! << 16)) << 8) >> 8;
       return v / 0x800000;
     }
     if (format === 3 && bits === 32) return data.readFloatLE(off);

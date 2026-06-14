@@ -10,6 +10,9 @@ export const dspBackend: SynthBackend = {
   },
   async render(score: Score, opts: RenderOpts): Promise<BackendRender> {
     const audio = renderScoreDsp(score, { sampleRate: opts.sampleRate });
-    return { audio, loop: { kind: "wrap", loopSamples: Math.round(loopSeconds(score) * opts.sampleRate) } };
+    return {
+      audio,
+      loop: { kind: "wrap", loopSamples: Math.round(loopSeconds(score) * opts.sampleRate) },
+    };
   },
 };

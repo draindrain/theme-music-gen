@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { MODES, PITCH_CLASSES } from "../src/schema/params.ts";
 import {
-  MODE_INTERVALS, degreeToMidi, maxVoiceMovement, scalePitchClasses, triadMidi, voiceLeadTriads,
+  MODE_INTERVALS,
+  degreeToMidi,
+  maxVoiceMovement,
+  scalePitchClasses,
+  triadMidi,
+  voiceLeadTriads,
 } from "../src/theory/theory.ts";
 import { MOOD_PROFILES } from "../src/compose/arrange.ts";
 
@@ -16,8 +21,9 @@ describe("scales", () => {
   });
 
   it("C ionian is the white keys", () => {
-    expect([...scalePitchClasses({ tonic: "C", mode: "ionian" })].sort((a, b) => a - b))
-      .toEqual([0, 2, 4, 5, 7, 9, 11]);
+    expect([...scalePitchClasses({ tonic: "C", mode: "ionian" })].sort((a, b) => a - b)).toEqual([
+      0, 2, 4, 5, 7, 9, 11,
+    ]);
   });
 
   it("degreeToMidi maps tonic degree 0 to the tonic pitch class, octaves wrap", () => {

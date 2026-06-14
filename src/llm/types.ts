@@ -78,7 +78,11 @@ export const MODEL_CATALOG: ProviderCatalog[] = [
     envVar: "ANTHROPIC_API_KEY",
     defaultModel: "claude-sonnet-4-6",
     models: [
-      { id: "claude-sonnet-4-6", note: "balanced, recommended ($3/$15 per Mtok)", strictJsonSchema: true },
+      {
+        id: "claude-sonnet-4-6",
+        note: "balanced, recommended ($3/$15 per Mtok)",
+        strictJsonSchema: true,
+      },
       { id: "claude-opus-4-8", note: "best taste, priciest ($5/$25)", strictJsonSchema: true },
       { id: "claude-haiku-4-5", note: "cheapest, fastest ($1/$5)", strictJsonSchema: true },
     ],
@@ -88,14 +92,42 @@ export const MODEL_CATALOG: ProviderCatalog[] = [
     envVar: "GROQ_API_KEY",
     defaultModel: "openai/gpt-oss-120b",
     models: [
-      { id: "openai/gpt-oss-120b", note: "recommended default; strict JSON (~$0.15/$0.75)", strictJsonSchema: true },
-      { id: "moonshotai/kimi-k2-instruct-0905", note: "strongest judgment; strict JSON (~$1/$3)", strictJsonSchema: true },
-      { id: "llama-3.3-70b-versatile", note: "solid workhorse; JSON mode (~$0.59/$0.79)", strictJsonSchema: false },
-      { id: "meta-llama/llama-4-maverick-17b-128e-instruct", note: "Llama 4 Maverick; JSON mode", strictJsonSchema: false },
-      { id: "meta-llama/llama-4-scout-17b-16e-instruct", note: "smaller Llama 4; JSON mode", strictJsonSchema: false },
+      {
+        id: "openai/gpt-oss-120b",
+        note: "recommended default; strict JSON (~$0.15/$0.75)",
+        strictJsonSchema: true,
+      },
+      {
+        id: "moonshotai/kimi-k2-instruct-0905",
+        note: "strongest judgment; strict JSON (~$1/$3)",
+        strictJsonSchema: true,
+      },
+      {
+        id: "llama-3.3-70b-versatile",
+        note: "solid workhorse; JSON mode (~$0.59/$0.79)",
+        strictJsonSchema: false,
+      },
+      {
+        id: "meta-llama/llama-4-maverick-17b-128e-instruct",
+        note: "Llama 4 Maverick; JSON mode",
+        strictJsonSchema: false,
+      },
+      {
+        id: "meta-llama/llama-4-scout-17b-16e-instruct",
+        note: "smaller Llama 4; JSON mode",
+        strictJsonSchema: false,
+      },
       { id: "qwen3-32b", note: "Qwen3; JSON mode", strictJsonSchema: false },
-      { id: "openai/gpt-oss-20b", note: "budget; strict JSON (~$0.075/$0.30)", strictJsonSchema: true },
-      { id: "llama-3.1-8b-instant", note: "cheapest/fastest; JSON mode (~$0.05/$0.08)", strictJsonSchema: false },
+      {
+        id: "openai/gpt-oss-20b",
+        note: "budget; strict JSON (~$0.075/$0.30)",
+        strictJsonSchema: true,
+      },
+      {
+        id: "llama-3.1-8b-instant",
+        note: "cheapest/fastest; JSON mode (~$0.05/$0.08)",
+        strictJsonSchema: false,
+      },
     ],
   },
 ];
