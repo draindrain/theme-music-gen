@@ -17,7 +17,7 @@ import { pathToFileURL } from "node:url";
 import {
   MOODS, MoodSchema, parseCharacterParams, parseLocationParams, parseDescription,
   ParamValidationError, parseParams,
-  type CharacterParams, type LocationParams, type Mood, type Description, type Params,
+  type CharacterParams, type LocationParams, type Description, type Params,
 } from "../schema/params.ts";
 import { characterPrompt, locationPrompt } from "../schema/prompt.ts";
 import { generateParams } from "../llm/generate.ts";

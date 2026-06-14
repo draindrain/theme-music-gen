@@ -34,7 +34,7 @@ export const anthropicProvider: ParamLlmProvider = {
     try {
       return JSON.parse(text);
     } catch (e) {
-      throw new Error(`Anthropic response was not valid JSON: ${(e as Error).message}`);
+      throw new Error(`Anthropic response was not valid JSON: ${(e as Error).message}`, { cause: e });
     }
   },
 };

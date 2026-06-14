@@ -75,7 +75,7 @@ function renderNoteInto(
   let modPhase = 0;
 
   let lp = 0;
-  let env = 0;
+  let env: number;
   const aN = Math.max(1, a * sampleRate);
   const dN = Math.max(1, d * sampleRate);
   const rN = Math.max(1, r * sampleRate);

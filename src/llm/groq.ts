@@ -39,7 +39,7 @@ export const groqProvider: ParamLlmProvider = {
     try {
       return JSON.parse(content);
     } catch (e) {
-      throw new Error(`Groq response was not valid JSON: ${(e as Error).message}`);
+      throw new Error(`Groq response was not valid JSON: ${(e as Error).message}`, { cause: e });
     }
   },
 };

@@ -12,7 +12,7 @@ import { createServer } from "node:http";
 import { createReadStream, existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { basename, extname, join, normalize, relative, resolve, sep } from "node:path";
 import {
-  FORMATS, readManifest, renderSet, RenderRequestError,
+  FORMATS, renderSet, RenderRequestError,
   type Format, type Manifest, type RenderItem,
 } from "../pipeline.ts";
 import {
