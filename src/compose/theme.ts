@@ -5,10 +5,11 @@
  * degree/rhythm sequence is identical across moods: that is the test
  * for "recognizable".
  */
-import type { CharacterParams, Contour, IntervalStyle, RhythmFeel } from "../schema/params.ts";
+import type { CharacterParams, IntervalStyle, RhythmFeel } from "../schema/params.ts";
+import { degreeClass } from "../theory/theory.ts";
 import { Rng } from "../util/prng.ts";
 import { bigramWeight, trigramWeight } from "./corpus.ts";
-import { scoreTheme } from "./melody-score.ts";
+import { contourTarget, scoreTheme } from "./melody-score.ts";
 
 export type Episode = Theme;
 
@@ -47,18 +48,6 @@ const RHYTHM_PATTERNS: Record<RhythmFeel, [number, number][][]> = {
   ],
 };
 
-/** Target melodic shape (in degrees) at phrase position t in [0,1]. */
-function contourTarget(contour: Contour, t: number): number {
-  switch (contour) {
-    case "rising": return -1 + 7 * t;
-    case "falling": return 6 - 7 * t;
-    case "arch": return 6 * Math.sin(Math.PI * t);
-    case "valley": return 4 - 6 * Math.sin(Math.PI * t);
-    case "wave": return 3 * Math.sin(2 * Math.PI * t);
-    case "static": return 0.8 * Math.sin(3 * Math.PI * t);
-  }
-}
-
 const STEP_CHOICES: Record<IntervalStyle, readonly number[]> = {
   stepwise: [-2, -1, -1, 1, 1, 2],
   mixed: [-3, -2, -1, 1, 2, 3, 4, -4],
@@ -69,7 +58,7 @@ const STEP_CHOICES: Record<IntervalStyle, readonly number[]> = {
 const STABLE_DEGREES = new Set([0, 2, 4]);
 
 function isStable(deg: number): boolean {
-  return STABLE_DEGREES.has(((deg % 7) + 7) % 7);
+  return STABLE_DEGREES.has(degreeClass(deg));
 }
 
 /**

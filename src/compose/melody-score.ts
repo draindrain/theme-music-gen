@@ -5,8 +5,10 @@
 import { trigramWeight } from "./corpus.ts";
 import type { Theme } from "./theme.ts";
 import type { Contour } from "../schema/params.ts";
+import { degreeClass } from "../theory/theory.ts";
 
-function contourTarget(contour: Contour, t: number): number {
+/** Target melodic shape (in degrees) at phrase position t in [0,1]. */
+export function contourTarget(contour: Contour, t: number): number {
   switch (contour) {
     case "rising":  return -1 + 7 * t;
     case "falling": return 6 - 7 * t;
@@ -102,7 +104,7 @@ function tonicGrounding(degrees: number[], onsets: number[]): number {
   for (let i = 0; i < degrees.length; i++) {
     if ((onsets[i]! % 2) !== 0) continue;
     strong++;
-    if (CHORD.has(((degrees[i]! % 7) + 7) % 7)) grounded++;
+    if (CHORD.has(degreeClass(degrees[i]!))) grounded++;
   }
   return strong === 0 ? 0.5 : grounded / strong;
 }

@@ -26,7 +26,7 @@ import { generateParams } from "../llm/generate.ts";
 import { MODEL_CATALOG } from "../llm/types.ts";
 import { listBackends } from "../synth/backend.ts";
 import { haveBinary } from "../post/post.ts";
-import { hashString } from "../util/prng.ts";
+import { defaultSeed } from "../util/prng.ts";
 import { cleanupOldJobs, createJob, isJobId, jobDir, zipJob } from "./jobs.ts";
 import { PAGE_HTML } from "./page.ts";
 
@@ -48,11 +48,6 @@ const JOB_TTL_MS = 24 * 60 * 60 * 1000; // discard job dirs after a day
 function safeJoin(root: string, rel: string): string | null {
   const abs = resolve(join(root, normalize(rel)));
   return abs.startsWith(resolve(root) + sep) || abs === resolve(root) ? abs : null;
-}
-
-/** The default seed the copy-paste flow prints — keep prompts reproducible. */
-function defaultSeed(id: string): number {
-  return hashString(id) % 0xffffffff;
 }
 
 /** Read the bundled fixtures into descriptions + params for the seed profile. */

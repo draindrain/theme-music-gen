@@ -34,7 +34,7 @@ import {
   detectTempo, inKeyEnergyRatio, loopSeamReport, isEffectivelySilent, tempoMatches,
 } from "../analysis/analyze.ts";
 import { PITCH_CLASSES, MODES, type PitchClass, type Mode } from "../schema/params.ts";
-import { hashString } from "../util/prng.ts";
+import { defaultSeed } from "../util/prng.ts";
 import { startServer } from "../serve/server.ts";
 
 interface Args {
@@ -97,7 +97,7 @@ function loadLocationParams(path: string): LocationParams {
 /** elara.json -> deterministic default seed (matches the printed prompt). */
 function seedFor(desc: Description, args: Args): number {
   const seedFlag = args.flags.get("seed");
-  return typeof seedFlag === "string" ? Number(seedFlag) : hashString(desc.id) % 0xffffffff;
+  return typeof seedFlag === "string" ? Number(seedFlag) : defaultSeed(desc.id);
 }
 
 /** Validate a raw params object against the schema + description, then write it. */

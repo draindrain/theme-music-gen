@@ -14,6 +14,15 @@ export function hashString(s: string): number {
   return h >>> 0;
 }
 
+/**
+ * Deterministic default seed for a description/subject id. The CLI and the web
+ * studio both rely on this so an id without an explicit seed renders identically
+ * in either entry point.
+ */
+export function defaultSeed(id: string): number {
+  return hashString(id) % 0xffffffff;
+}
+
 export class Rng {
   private state: number;
 
