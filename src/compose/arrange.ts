@@ -442,60 +442,22 @@ function bassBar(bar: number, chordRoot: number, key: Key, style: BassStyle, vel
 }
 
 // ---------------------------------------------------------------------------
-// Main composition entry point
+// Lead voice: walk sections, filling each with repeats of its 2-bar material.
+// Returns the lead notes plus the section-start bars where the lead rests (so
+// the harmony can play a theme statement there — see the handoff layer).
 // ---------------------------------------------------------------------------
 
-export function composeScore(params: CharacterParams, mood: Mood): Score {
-  const profile = MOOD_PROFILES[mood];
-  const theme = generateTheme(params);
-  // Structure RNG is keyed by subject + mood, so two characters in the same
-  // mood get DIFFERENT macro-structure. The theme itself stays mood-independent.
-  const rng = new Rng(params.seed).fork(`arr:${params.id}:${mood}`);
-  const key: Key = {
-    tonic: params.key.tonic,
-    mode: effectiveMode(params.key.mode, profile.modeShift),
-  };
-  const tempoBpm = Math.round(TEMPO_BPM[params.baseTempo] * profile.tempoFactor);
-
-  const leadOctave =
-    5 +
-    (params.brightness === "bright" ? 0 : params.brightness === "dark" ? -1 : 0) +
-    Math.round(profile.registerShift / 7);
-
-  // --- form: sample a corpus-derived phrase-form template, expand to sections ---
-  const template = rng
-    .fork("form")
-    .pickWeighted(formTemplates().map((t) => [t, t.weight] as const));
-  const sections = buildSections(template, profile, rng.fork("sections"));
-  const totalBars = template.totalBars;
-  const loopBeatsTotal = totalBars * BEATS_PER_BAR;
-  const homeLabel = sections[0]!.label;
-
-  // bar -> section lookup
-  const barToSection: Section[] = new Array<Section>(totalBars);
-  for (const sec of sections)
-    for (let b = 0; b < sec.bars; b++) barToSection[sec.startBar + b] = sec;
-
-  // --- chord plan: progression tiled per section (home=A, contrasting=B) ---
-  const chordRoots: number[] = [];
-  for (let bar = 0; bar < totalBars; bar++) {
-    const sec = barToSection[bar]!;
-    const prog = sec.label === homeLabel ? profile.progressionA : profile.progressionB;
-    chordRoots.push(prog[(bar - sec.startBar) % prog.length]!);
-  }
-  const voicings = voiceLeadTriads(key, chordRoots, 4);
-
-  // --- material per phrase label: home label = theme, others = episodes ---
-  const episodeRng = rng.fork("episode");
-  const materialByLabel = new Map<string, Theme>([[homeLabel, theme]]);
-  for (const sec of sections)
-    if (!materialByLabel.has(sec.label))
-      materialByLabel.set(sec.label, generateEpisode(theme, episodeRng));
-
-  // --- lead: walk sections, filling each with repeats of its 2-bar material ---
-  const leadRng = rng.fork("lead");
+function buildLead(
+  sections: readonly Section[],
+  materialByLabel: ReadonlyMap<string, Theme>,
+  theme: Theme,
+  key: Key,
+  leadOctave: number,
+  profile: MoodProfile,
+  leadRng: Rng,
+): { lead: Note[]; handoffBars: number[] } {
   const lead: Note[] = [];
-  const handoffBars: number[] = []; // section-start bars where the lead rests
+  const handoffBars: number[] = [];
 
   for (const sec of sections) {
     if (sec.content === "rest") {
@@ -558,6 +520,145 @@ export function composeScore(params: CharacterParams, mood: Mood): Score {
       }
     }
   }
+  return { lead, handoffBars };
+}
+
+// ---------------------------------------------------------------------------
+// Percussion (GM drum keys); per-section gating, fills at section ends
+// ---------------------------------------------------------------------------
+
+const KICK = 36,
+  RIM = 37,
+  HAT = 42,
+  SHAKER = 70;
+
+function buildPercussion(
+  totalBars: number,
+  barToSection: readonly Section[],
+  profile: MoodProfile,
+  weight: CharacterParams["weight"],
+  mood: Mood,
+): Note[] {
+  const percussion: Note[] = [];
+  if (!profile.layers.percussion || weight === "light") return percussion;
+
+  for (let bar = 0; bar < totalBars; bar++) {
+    const sec = barToSection[bar]!;
+    if (!sec.percussion) continue;
+
+    const b = bar * 4;
+    const isFill = bar === sec.startBar + sec.bars - 1;
+
+    if (mood === "tense") {
+      percussion.push({ startBeat: b, durBeats: 0.3, midi: KICK, velocity: 0.7 });
+      percussion.push({ startBeat: b + 2, durBeats: 0.3, midi: KICK, velocity: 0.55 });
+      for (let e = 0; e < 8; e++)
+        percussion.push({
+          startBeat: b + e / 2,
+          durBeats: 0.1,
+          midi: HAT,
+          velocity: e % 2 ? 0.25 : 0.4,
+        });
+      if (isFill) {
+        // rapid fill on 4th beat
+        for (let e = 0; e < 4; e++)
+          percussion.push({
+            startBeat: b + 3 + e * 0.25,
+            durBeats: 0.1,
+            midi: RIM,
+            velocity: 0.5 + e * 0.1,
+          });
+      }
+    } else {
+      percussion.push({ startBeat: b, durBeats: 0.3, midi: KICK, velocity: 0.6 });
+      percussion.push({ startBeat: b + 2.5, durBeats: 0.3, midi: KICK, velocity: 0.4 });
+      percussion.push({ startBeat: b + 1, durBeats: 0.2, midi: RIM, velocity: 0.35 });
+      percussion.push({ startBeat: b + 3, durBeats: 0.2, midi: RIM, velocity: 0.35 });
+      for (let e = 0; e < 8; e++) {
+        let onset = e / 2;
+        if (profile.swing > 0 && e % 2 === 1) onset += profile.swing;
+        percussion.push({
+          startBeat: b + onset,
+          durBeats: 0.1,
+          midi: SHAKER,
+          velocity: e % 2 ? 0.2 : 0.32,
+        });
+      }
+      if (isFill) {
+        for (let e = 0; e < 4; e++)
+          percussion.push({
+            startBeat: b + 3 + e * 0.25,
+            durBeats: 0.1,
+            midi: RIM,
+            velocity: 0.45 + e * 0.1,
+          });
+      }
+    }
+  }
+  return percussion;
+}
+
+// ---------------------------------------------------------------------------
+// Main composition entry point
+// ---------------------------------------------------------------------------
+
+export function composeScore(params: CharacterParams, mood: Mood): Score {
+  const profile = MOOD_PROFILES[mood];
+  const theme = generateTheme(params);
+  // Structure RNG is keyed by subject + mood, so two characters in the same
+  // mood get DIFFERENT macro-structure. The theme itself stays mood-independent.
+  const rng = new Rng(params.seed).fork(`arr:${params.id}:${mood}`);
+  const key: Key = {
+    tonic: params.key.tonic,
+    mode: effectiveMode(params.key.mode, profile.modeShift),
+  };
+  const tempoBpm = Math.round(TEMPO_BPM[params.baseTempo] * profile.tempoFactor);
+
+  const leadOctave =
+    5 +
+    (params.brightness === "bright" ? 0 : params.brightness === "dark" ? -1 : 0) +
+    Math.round(profile.registerShift / 7);
+
+  // --- form: sample a corpus-derived phrase-form template, expand to sections ---
+  const template = rng
+    .fork("form")
+    .pickWeighted(formTemplates().map((t) => [t, t.weight] as const));
+  const sections = buildSections(template, profile, rng.fork("sections"));
+  const totalBars = template.totalBars;
+  const loopBeatsTotal = totalBars * BEATS_PER_BAR;
+  const homeLabel = sections[0]!.label;
+
+  // bar -> section lookup
+  const barToSection: Section[] = new Array<Section>(totalBars);
+  for (const sec of sections)
+    for (let b = 0; b < sec.bars; b++) barToSection[sec.startBar + b] = sec;
+
+  // --- chord plan: progression tiled per section (home=A, contrasting=B) ---
+  const chordRoots: number[] = [];
+  for (let bar = 0; bar < totalBars; bar++) {
+    const sec = barToSection[bar]!;
+    const prog = sec.label === homeLabel ? profile.progressionA : profile.progressionB;
+    chordRoots.push(prog[(bar - sec.startBar) % prog.length]!);
+  }
+  const voicings = voiceLeadTriads(key, chordRoots, 4);
+
+  // --- material per phrase label: home label = theme, others = episodes ---
+  const episodeRng = rng.fork("episode");
+  const materialByLabel = new Map<string, Theme>([[homeLabel, theme]]);
+  for (const sec of sections)
+    if (!materialByLabel.has(sec.label))
+      materialByLabel.set(sec.label, generateEpisode(theme, episodeRng));
+
+  // --- lead: walk sections, filling each with repeats of its 2-bar material ---
+  const { lead, handoffBars } = buildLead(
+    sections,
+    materialByLabel,
+    theme,
+    key,
+    leadOctave,
+    profile,
+    rng.fork("lead"),
+  );
 
   // --- harmony: voice-led triads, style + dynamics + density per section ---
   const harmony: Note[] = [];
@@ -650,66 +751,7 @@ export function composeScore(params: CharacterParams, mood: Mood): Score {
   }
 
   // --- percussion (GM drum keys); per-section gating, fills at section ends ---
-  const KICK = 36,
-    RIM = 37,
-    HAT = 42,
-    SHAKER = 70;
-  const percussion: Note[] = [];
-  if (profile.layers.percussion && params.weight !== "light") {
-    for (let bar = 0; bar < totalBars; bar++) {
-      const sec = barToSection[bar]!;
-      if (!sec.percussion) continue;
-
-      const b = bar * 4;
-      const isFill = bar === sec.startBar + sec.bars - 1;
-
-      if (mood === "tense") {
-        percussion.push({ startBeat: b, durBeats: 0.3, midi: KICK, velocity: 0.7 });
-        percussion.push({ startBeat: b + 2, durBeats: 0.3, midi: KICK, velocity: 0.55 });
-        for (let e = 0; e < 8; e++)
-          percussion.push({
-            startBeat: b + e / 2,
-            durBeats: 0.1,
-            midi: HAT,
-            velocity: e % 2 ? 0.25 : 0.4,
-          });
-        if (isFill) {
-          // rapid fill on 4th beat
-          for (let e = 0; e < 4; e++)
-            percussion.push({
-              startBeat: b + 3 + e * 0.25,
-              durBeats: 0.1,
-              midi: RIM,
-              velocity: 0.5 + e * 0.1,
-            });
-        }
-      } else {
-        percussion.push({ startBeat: b, durBeats: 0.3, midi: KICK, velocity: 0.6 });
-        percussion.push({ startBeat: b + 2.5, durBeats: 0.3, midi: KICK, velocity: 0.4 });
-        percussion.push({ startBeat: b + 1, durBeats: 0.2, midi: RIM, velocity: 0.35 });
-        percussion.push({ startBeat: b + 3, durBeats: 0.2, midi: RIM, velocity: 0.35 });
-        for (let e = 0; e < 8; e++) {
-          let onset = e / 2;
-          if (profile.swing > 0 && e % 2 === 1) onset += profile.swing;
-          percussion.push({
-            startBeat: b + onset,
-            durBeats: 0.1,
-            midi: SHAKER,
-            velocity: e % 2 ? 0.2 : 0.32,
-          });
-        }
-        if (isFill) {
-          for (let e = 0; e < 4; e++)
-            percussion.push({
-              startBeat: b + 3 + e * 0.25,
-              durBeats: 0.1,
-              midi: RIM,
-              velocity: 0.45 + e * 0.1,
-            });
-        }
-      }
-    }
-  }
+  const percussion = buildPercussion(totalBars, barToSection, profile, params.weight, mood);
 
   // --- loop-seam safety: keep every note inside [0, loopBeats), cap tails ---
   const sanitize = (notes: Note[]): Note[] =>
