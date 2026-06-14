@@ -354,7 +354,6 @@ function harmonyBar(
   style: HarmonyStyle,
   vel: number,
   rng: Rng,
-  swing: number,
 ): Note[] {
   const out: Note[] = [];
   const b = bar * BEATS_PER_BAR;
@@ -395,7 +394,6 @@ function harmonyBar(
           velocity: clamp01(vel * 0.85 + rng.range(-0.04, 0.04)),
         });
   }
-  void swing;
   return out;
 }
 
@@ -666,7 +664,7 @@ export function composeScore(params: CharacterParams, mood: Mood): Score {
   for (let bar = 0; bar < totalBars; bar++) {
     const sec = barToSection[bar]!;
     const vel = profile.velocity * 0.72 * sec.dynamic * (0.7 + 0.3 * sec.density);
-    harmony.push(...harmonyBar(bar, voicings[bar]!, sec.harmony, vel, harmRng, profile.swing));
+    harmony.push(...harmonyBar(bar, voicings[bar]!, sec.harmony, vel, harmRng));
   }
 
   // --- bass: style + dynamics per section ---

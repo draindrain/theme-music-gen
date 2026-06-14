@@ -18,6 +18,11 @@ export interface DspRenderOpts {
 
 const TWO_PI = Math.PI * 2;
 
+/** Square-wave peak amplitude — pulled in from ±1 to tame the harsh fundamental. */
+const SQUARE_AMPLITUDE = 0.7;
+/** Keep the lowpass cutoff below this fraction of the sample rate (Nyquist guard). */
+const NYQUIST_GUARD = 0.45;
+
 function midiToFreq(m: number): number {
   return 440 * Math.pow(2, (m - 69) / 12);
 }
@@ -32,7 +37,7 @@ function oscSample(kind: string, phase: number): number {
     case "saw":
       return 2 * p - 1;
     case "square":
-      return p < 0.5 ? 0.7 : -0.7;
+      return p < 0.5 ? SQUARE_AMPLITUDE : -SQUARE_AMPLITUDE;
     default:
       return Math.sin(TWO_PI * p);
   }
@@ -67,7 +72,11 @@ function renderNoteInto(
 
   const unison = patch.unison ?? 1;
   const detune = (patch.detuneCents ?? 0) / 1200;
-  const cutoffHz = Math.min(patch.cutoffMax ?? 9000, freq * patch.cutoffRatio, sampleRate * 0.45);
+  const cutoffHz = Math.min(
+    patch.cutoffMax ?? 9000,
+    freq * patch.cutoffRatio,
+    sampleRate * NYQUIST_GUARD,
+  );
   // one-pole lowpass coefficient
   const lpC = Math.exp((-TWO_PI * cutoffHz) / sampleRate);
   const vib = patch.vibrato;
