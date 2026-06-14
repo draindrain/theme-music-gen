@@ -51,11 +51,18 @@ export const soundfontBackend: SynthBackend = {
       const midPath = join(dir, "score.mid");
       const wavPath = join(dir, "score.wav");
       writeFileSync(midPath, midi);
-      execFileSync(
-        "fluidsynth",
-        ["-ni", "-g", "0.6", "-r", String(sr), "-F", wavPath, soundfontPath(), midPath],
-        { stdio: ["ignore", "ignore", "pipe"] },
-      );
+      try {
+        execFileSync(
+          "fluidsynth",
+          ["-ni", "-g", "0.6", "-r", String(sr), "-F", wavPath, soundfontPath(), midPath],
+          { stdio: ["ignore", "ignore", "pipe"] },
+        );
+      } catch (e) {
+        const stderr = (e as { stderr?: Buffer }).stderr?.toString().trim();
+        throw new Error(`fluidsynth failed to render the score${stderr ? `: ${stderr}` : ""}`, {
+          cause: e,
+        });
+      }
       const audio = fitLength(
         decodeWav(readFileSync(wavPath)),
         Math.round((loopSeconds(score) + TAIL_SEC) * sr),

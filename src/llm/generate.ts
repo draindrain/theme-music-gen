@@ -38,6 +38,11 @@ function basePrompt(desc: Description, seed: number): string {
 }
 
 function mergeAndValidate(raw: unknown, desc: Description, seed: number, source: string): Params {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    throw new Error(
+      `${source} returned ${Array.isArray(raw) ? "an array" : typeof raw}, expected a JSON object of params fields`,
+    );
+  }
   // Our fields come last so a model can't override the id/seed/kind we own.
   const full = {
     ...(raw as Record<string, unknown>),

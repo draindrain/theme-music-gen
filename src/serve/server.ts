@@ -257,14 +257,22 @@ export async function startServer(opts: ServeOpts): Promise<import("node:http").
           "cache-control": "no-store",
         });
         const stream = createReadStream(zipPath);
-        stream.pipe(res);
-        stream.on("close", () => {
+        const cleanup = () => {
           try {
             rmSync(zipPath, { force: true });
           } catch {
             /* ignore */
           }
+        };
+        stream.on("error", (err) => {
+          // A read failure mid-transfer must not crash the server. Abort the
+          // response (headers are already sent, so we can't send a 500) and
+          // still remove the temp zip.
+          res.destroy(err);
+          cleanup();
         });
+        stream.on("close", cleanup);
+        stream.pipe(res);
         return;
       }
 

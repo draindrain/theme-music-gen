@@ -144,11 +144,19 @@ export function encodeOgg(wavPath: string, oggPath: string): void {
       "ffmpeg",
       "Install it (e.g. `apt install ffmpeg` / `brew install ffmpeg` / `winget install Gyan.FFmpeg`) to get OGG output.",
     );
-  execFileSync(
-    "ffmpeg",
-    ["-y", "-loglevel", "error", "-i", wavPath, "-c:a", "libvorbis", "-q:a", "5", oggPath],
-    { stdio: "inherit" },
-  );
+  try {
+    execFileSync(
+      "ffmpeg",
+      ["-y", "-loglevel", "error", "-i", wavPath, "-c:a", "libvorbis", "-q:a", "5", oggPath],
+      { stdio: ["ignore", "ignore", "pipe"] },
+    );
+  } catch (e) {
+    const stderr = (e as { stderr?: Buffer }).stderr?.toString().trim();
+    throw new Error(
+      `ffmpeg failed to encode OGG (${wavPath} -> ${oggPath})${stderr ? `: ${stderr}` : ""}`,
+      { cause: e },
+    );
+  }
 }
 
 export interface FinalizeResult {
