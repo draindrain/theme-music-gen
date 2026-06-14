@@ -1,23 +1,36 @@
 /**
- * Local audition server: lists every generated asset with players, shows the
- * parameter file beside each track, A/B across backends, and re-renders after
- * parameter edits. Localhost-only by design; no auth, no hosting.
+ * Stateless web server: a thin HTTP adapter over the library core. It validates
+ * inputs, builds prompts / calls the LLM for params, renders a submitted set of
+ * {description, params} items into a short-lived per-request job directory
+ * (via the core renderSet), serves those files, and zips them for download.
+ *
+ * Profiles live in the browser (localStorage); the server keeps no per-user
+ * state. All rendering/validation logic stays in the core — every route here
+ * just parses a request and delegates. Localhost by default; no auth (yet).
  */
 import { createServer } from "node:http";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { extname, join, normalize, resolve, sep } from "node:path";
-import { readManifest } from "../pipeline.ts";
-import { renderAmbienceAsset, renderMusicAsset } from "../pipeline.ts";
+import { createReadStream, existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { basename, extname, join, normalize, relative, resolve, sep } from "node:path";
 import {
-  MOODS, MoodSchema, parseCharacterParams, parseLocationParams, parseParams,
-  ParamValidationError,
+  FORMATS, readManifest, renderSet, RenderRequestError,
+  type Format, type Manifest, type RenderItem,
+} from "../pipeline.ts";
+import {
+  MOODS, MoodSchema, parseDescription, parseParams, ParamValidationError,
+  type Description, type Mood, type Params,
 } from "../schema/params.ts";
+import { characterPrompt, locationPrompt } from "../schema/prompt.ts";
+import { generateParams } from "../llm/generate.ts";
+import { MODEL_CATALOG } from "../llm/types.ts";
 import { listBackends } from "../synth/backend.ts";
+import { haveBinary } from "../post/post.ts";
+import { hashString } from "../util/prng.ts";
+import { cleanupOldJobs, createJob, isJobId, jobDir, zipJob } from "./jobs.ts";
 import { PAGE_HTML } from "./page.ts";
 
 export interface ServeOpts {
-  outDir: string;
   fixturesDir: string;
+  jobsDir: string;
   port: number;
 }
 
@@ -28,13 +41,55 @@ const MIME: Record<string, string> = {
   ".json": "application/json",
 };
 
+const JOB_TTL_MS = 24 * 60 * 60 * 1000; // discard job dirs after a day
+
 function safeJoin(root: string, rel: string): string | null {
   const abs = resolve(join(root, normalize(rel)));
   return abs.startsWith(resolve(root) + sep) || abs === resolve(root) ? abs : null;
 }
 
+/** The default seed the copy-paste flow prints — keep prompts reproducible. */
+function defaultSeed(id: string): number {
+  return hashString(id) % 0xffffffff;
+}
+
+/** Read the bundled fixtures into descriptions + params for the seed profile. */
+function readSeed(fixturesDir: string): { descriptions: Description[]; params: Record<string, Params> } {
+  const descriptions: Description[] = [];
+  const params: Record<string, Params> = {};
+  for (const sub of ["characters", "locations"]) {
+    const dir = join(fixturesDir, sub);
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir)) {
+      if (!f.endsWith(".json") || f.endsWith(".params.json")) continue;
+      const descPath = join(dir, f);
+      const desc = parseDescription(JSON.parse(readFileSync(descPath, "utf8")), descPath);
+      descriptions.push(desc);
+      const pPath = join(dir, basename(f, ".json") + ".params.json");
+      if (existsSync(pPath)) params[desc.id] = parseParams(JSON.parse(readFileSync(pPath, "utf8")), pPath);
+    }
+  }
+  return { descriptions, params };
+}
+
+/** Rewrite a manifest's on-disk paths to be relative to the job dir, so the
+ * frontend can fetch them via /file?job=<id>&path=<rel>. */
+function relativizeManifest(manifest: Manifest, dir: string): Manifest {
+  const rel = (p: string) => relative(dir, resolve(p));
+  return {
+    assets: manifest.assets.map((a) => ({
+      ...a,
+      wav: rel(a.wav),
+      ...(a.ogg ? { ogg: rel(a.ogg) } : {}),
+      ...("mid" in a && a.mid ? { mid: rel(a.mid) } : {}),
+      params: rel(a.params),
+    })) as Manifest["assets"],
+  };
+}
+
 export async function startServer(opts: ServeOpts): Promise<import("node:http").Server> {
-  const { outDir, fixturesDir, port } = opts;
+  const { fixturesDir, jobsDir, port } = opts;
+  cleanupOldJobs(jobsDir, JOB_TTL_MS);
 
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
@@ -42,77 +97,137 @@ export async function startServer(opts: ServeOpts): Promise<import("node:http").
       res.writeHead(code, { "content-type": type, "cache-control": "no-store" });
       res.end(body);
     };
+    const json = (code: number, obj: unknown) => send(code, JSON.stringify(obj));
     try {
+      // ---- static page ----
       if (req.method === "GET" && url.pathname === "/") {
         return send(200, PAGE_HTML, "text/html; charset=utf-8");
       }
-      if (req.method === "GET" && url.pathname === "/api/state") {
-        const manifest = readManifest(outDir);
+
+      // ---- capabilities: what synths/formats/models are available ----
+      if (req.method === "GET" && url.pathname === "/api/capabilities") {
         const backends = listBackends().map((b) => ({ name: b.name, ...b.availability() }));
-        return send(200, JSON.stringify({ manifest, backends, moods: MOODS, outDir, fixturesDir }));
+        return json(200, {
+          backends, moods: MOODS, models: MODEL_CATALOG,
+          formats: FORMATS, haveFfmpeg: haveBinary("ffmpeg"),
+        });
       }
-      if (req.method === "GET" && url.pathname === "/file") {
-        // serves files referenced by the manifest (under outDir) or fixtures.
-        // Try each root, falling through when the resolved path doesn't exist
-        // (safeJoin only guards against traversal, not existence).
-        const rel = url.searchParams.get("path") ?? "";
-        let abs: string | null = null;
-        for (const root of [outDir, fixturesDir]) {
-          const cand = safeJoin(resolve(root), relTo(rel, root));
-          if (cand && existsSync(cand)) { abs = cand; break; }
+
+      // ---- seed: the bundled fixtures for the default profile ----
+      if (req.method === "GET" && url.pathname === "/api/seed") {
+        return json(200, readSeed(fixturesDir));
+      }
+
+      // ---- validate a description or params object ----
+      if (req.method === "POST" && url.pathname === "/api/validate") {
+        const body = JSON.parse(await readBody(req)) as { kind: "description" | "params"; content: unknown };
+        if (body.kind === "description") parseDescription(body.content, "description");
+        else parseParams(body.content, "params");
+        return json(200, { ok: true });
+      }
+
+      // ---- build the copy-paste LLM prompt for a description ----
+      if (req.method === "POST" && url.pathname === "/api/prompt") {
+        const body = JSON.parse(await readBody(req)) as { description: unknown };
+        const desc = parseDescription(body.description, "description");
+        const seed = defaultSeed(desc.id);
+        const prompt = desc.kind === "character" ? characterPrompt(desc, seed) : locationPrompt(desc, seed);
+        return json(200, { prompt });
+      }
+
+      // ---- generate params via an LLM (session-only API key) ----
+      if (req.method === "POST" && url.pathname === "/api/generate-params") {
+        const body = JSON.parse(await readBody(req)) as {
+          description: unknown; provider: string; model: string; apiKey: string;
+        };
+        const desc = parseDescription(body.description, "description");
+        if (!body.apiKey) return json(400, { error: "missing API key" });
+        try {
+          const params = await generateParams({
+            providerName: body.provider, model: body.model, apiKey: body.apiKey,
+            desc, seed: defaultSeed(desc.id),
+          });
+          return json(200, { params });
+        } catch (e) {
+          if (e instanceof ParamValidationError) throw e;
+          return json(400, { error: (e as Error).message });
         }
-        if (!abs) return send(404, JSON.stringify({ error: "not found" }));
+      }
+
+      // ---- the one big call: render the selected set into a job dir ----
+      if (req.method === "POST" && url.pathname === "/api/generate") {
+        cleanupOldJobs(jobsDir, JOB_TTL_MS);
+        const body = JSON.parse(await readBody(req)) as {
+          items: { description: unknown; params: unknown }[];
+          moods?: string[]; formats?: string[]; backends?: string[];
+        };
+        if (!Array.isArray(body.items) || body.items.length === 0)
+          return json(400, { error: "no items selected to generate" });
+
+        // Re-validate everything server-side — never trust the client payload.
+        const items: RenderItem[] = body.items.map((it) => ({
+          description: parseDescription(it.description, "description"),
+          params: parseParams(it.params, "params"),
+        }));
+        const moods: Mood[] | undefined = body.moods?.map((m) => MoodSchema.parse(m));
+        const formats = (body.formats ?? FORMATS).filter((f): f is Format =>
+          (FORMATS as readonly string[]).includes(f));
+        if (!formats.includes("wav")) formats.push("wav"); // wav is always emitted
+        const backends = body.backends ?? [];
+
+        const { id, dir } = createJob(jobsDir);
+        const { manifest } = await renderSet(items, {
+          outDir: dir, formats, backends, ...(moods ? { moods } : {}),
+        });
+        return json(200, { job: id, manifest: relativizeManifest(manifest, dir) });
+      }
+
+      // ---- serve a generated file from a job dir ----
+      if (req.method === "GET" && url.pathname === "/file") {
+        const id = url.searchParams.get("job") ?? "";
+        const rel = url.searchParams.get("path") ?? "";
+        if (!isJobId(id)) return json(400, { error: "invalid job id" });
+        const dir = jobDir(jobsDir, id);
+        const abs = safeJoin(dir, rel);
+        if (!abs || !existsSync(abs)) return json(404, { error: "not found" });
         return send(200, readFileSync(abs), MIME[extname(abs)] ?? "application/octet-stream");
       }
-      if (req.method === "POST" && url.pathname === "/api/params") {
-        const body = JSON.parse(await readBody(req)) as { id: string; kind: string; content: unknown };
-        const params = parseParams(body.content, "edited params"); // typed error on any out-of-enum value
-        if (params.id !== body.id) return send(400, JSON.stringify({ error: "id mismatch" }));
-        const file = join(
-          fixturesDir,
-          params.kind === "character" ? "characters" : "locations",
-          `${params.id}.params.json`,
-        );
-        writeFileSync(file, JSON.stringify(params, null, 2) + "\n");
-        return send(200, JSON.stringify({ ok: true, file }));
-      }
-      if (req.method === "POST" && url.pathname === "/api/regenerate") {
-        const body = JSON.parse(await readBody(req)) as {
-          type: "music" | "ambience"; id: string; mood?: string; backend?: string;
-        };
-        if (body.type === "music") {
-          const p = join(fixturesDir, "characters", `${body.id}.params.json`);
-          const params = parseCharacterParams(JSON.parse(readFileSync(p, "utf8")), p);
-          const mood = MoodSchema.parse(body.mood);
-          const backend = body.backend ?? "dsp";
-          const { asset } = await renderMusicAsset(params, mood, backend, outDir);
-          return send(200, JSON.stringify({ ok: true, asset }));
+
+      // ---- download everything in a job as a zip ----
+      if (req.method === "GET" && url.pathname === "/api/download") {
+        const id = url.searchParams.get("job") ?? "";
+        if (!isJobId(id)) return json(400, { error: "invalid job id" });
+        let zipPath: string;
+        try {
+          zipPath = zipJob(jobsDir, id);
+        } catch {
+          return json(404, { error: "job not found" });
         }
-        const p = join(fixturesDir, "locations", `${body.id}.params.json`);
-        const params = parseLocationParams(JSON.parse(readFileSync(p, "utf8")), p);
-        const { asset } = await renderAmbienceAsset(params, outDir);
-        return send(200, JSON.stringify({ ok: true, asset }));
+        res.writeHead(200, {
+          "content-type": "application/zip",
+          "content-disposition": `attachment; filename="score-${id}.zip"`,
+          "cache-control": "no-store",
+        });
+        const stream = createReadStream(zipPath);
+        stream.pipe(res);
+        stream.on("close", () => { try { rmSync(zipPath, { force: true }); } catch { /* ignore */ } });
+        return;
       }
-      send(404, JSON.stringify({ error: "not found" }));
+
+      json(404, { error: "not found" });
     } catch (e) {
-      const msg = e instanceof ParamValidationError ? e.message : (e as Error).message;
-      send(e instanceof ParamValidationError ? 400 : 500, JSON.stringify({ error: msg }));
+      if (e instanceof ParamValidationError || e instanceof RenderRequestError)
+        return json(400, { error: e.message });
+      if (e instanceof SyntaxError) return json(400, { error: `invalid JSON: ${e.message}` });
+      json(500, { error: (e as Error).message });
     }
   });
 
   await new Promise<void>((ok) => server.listen(port, "127.0.0.1", ok));
   const addr = server.address();
   const boundPort = typeof addr === "object" && addr ? addr.port : port;
-  console.log(`audition page: http://localhost:${boundPort}/  (out=${resolve(outDir)})`);
+  console.log(`score web app: http://localhost:${boundPort}/  (jobs=${resolve(jobsDir)})`);
   return server;
-}
-
-/** Manifest paths may be "out/music/..." or absolute; make them relative to root. */
-function relTo(p: string, root: string): string {
-  const abs = resolve(p);
-  const r = resolve(root);
-  if (abs.startsWith(r + sep)) return abs.slice(r.length + 1);
-  return p;
 }
 
 function readBody(req: import("node:http").IncomingMessage): Promise<string> {

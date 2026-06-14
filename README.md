@@ -8,7 +8,7 @@ batch command and get a finished soundtrack: WAV + OGG + MIDI for every cue.
 
 ```bash
 pnpm install && pnpm setup && pnpm batch ./fixtures
-pnpm serve            # then open the printed http://localhost:… to audition
+pnpm serve            # web studio: build, generate, audition & download in the browser
 ```
 
 ## Use cases
@@ -66,6 +66,8 @@ description.json  ──(you + any LLM)──▶  params.json   (strict, enum-on
   / `brew install fluid-synth` / `scoop install fluidsynth`)
 - **ffmpeg** — for OGG encoding. (`apt install ffmpeg` / `brew install ffmpeg`
   / `winget install Gyan.FFmpeg`)
+- **zip** — only for the web studio's "download all" button. (Usually preinstalled;
+  `apt install zip` / `brew install zip`.)
 
 **Windows:** [Scoop](https://scoop.sh) covers both in one command:
 ```powershell
@@ -92,7 +94,7 @@ the CLI and the audition server add no logic of their own.
 | `pnpm ambience <setting.json> [--out <dir>]` | Render one ambience bed. |
 | `pnpm batch <assets-dir> [--backend <name>\|all] [--out <dir>]` | Render every subject × every mood, plus every setting. |
 | `pnpm preview --mix <music.wav> <ambience.wav> [--out <file>]` | Mix a music + ambience pair for a quick listen. |
-| `pnpm serve [--out <dir>] [--fixtures <dir>] [--port <n>]` | Local audition page (see below). |
+| `pnpm serve [--fixtures <dir>] [--jobs <dir>] [--port <n>]` | Web studio: run the whole pipeline from the browser (see below). |
 | `pnpm analyze <file.wav> [--key "C ionian"] [--bpm <n>]` | Run the audio analysis harness on any WAV. |
 | `pnpm verify [<out-dir>]` | Re-analyze every asset in a manifest and report pass/fail. |
 
@@ -205,15 +207,35 @@ without echoing — it is never written to disk, the params file, or logs.
 Strict-JSON-capable models decode against the schema directly; the rest use
 JSON-object mode plus the schema spelled out in the prompt.
 
-## The audition page (`pnpm serve`)
+## The web studio (`pnpm serve`)
 
-A localhost-only page (no auth, no hosting) that, from the manifest:
+`pnpm serve` runs the **whole pipeline from the browser** — you don't need to run
+`pnpm batch` first. The server is a thin, stateless adapter over the same library
+the CLI uses (it calls the shared `renderSet` core); it keeps no per-user state.
 
-- lists every generated asset with an inline audio player;
-- shows the parameter file beside each track;
-- lets you **A/B the same subject/mood across backends** side by side;
-- has a **regenerate** button that re-renders after you edit parameters in the
-  browser (validated server-side — invalid edits are rejected, not saved).
+In the page you can:
+
+- **Profiles** — create or switch between named profiles. Each profile holds its
+  own characters/locations, their parameters, and generation settings. Profiles
+  are saved in the **browser's localStorage**; API keys are kept **in memory for
+  the session only** (never written to disk or localStorage). On first load a
+  `default` profile is seeded from the bundled fixtures.
+- **Descriptions** — add characters/locations with a form, or import description
+  JSON files. Everything is validated server-side.
+- **Parameters, three ways** per description — upload a `*.params.json` file, copy
+  a generated prompt into any chatbot and paste the reply back, or enter an API
+  key and generate them directly via Anthropic/Groq.
+- **Generate** — pick which subjects, which formats (`wav`/`ogg`/`mid`), and which
+  synths (`dsp`/`soundfont`/`api`) to render. One request renders the whole set
+  into a short-lived per-request job directory and serves it back.
+- **Audition & download** — browse and play every cue (A/B across backends), then
+  **download everything as a single zip** (descriptions + parameters + audio).
+
+Notes: localhost-only and no auth for now (it's built so auth can be added later).
+OGG output needs `ffmpeg` and the `soundfont` synth needs `fluidsynth`; both are
+offered only when available. The **download** button shells out to the `zip`
+binary. Job directories live under `--jobs` (default `jobs/`, gitignored) and are
+cleaned up automatically after a day.
 
 ## Backends, and how to add one
 
@@ -295,9 +317,9 @@ src/
   audio/       in-memory buffers + WAV codec
   post/        seamless loop, loudness normalization, OGG encode
   analysis/    the audio analysis harness (FFT, key, tempo, loop seam)
-  serve/       the audition server + page
+  serve/       the web studio: stateless HTTP server + page + per-request job dirs
   cli/         the CLI surface
-  pipeline.ts  params → Score → render → post → files (+ manifest)
+  pipeline.ts  params → Score → render → post → files (+ manifest); renderSet() core
 fixtures/      example subjects (visual novel characters) and settings (locations), with authored *.params.json
 scripts/       setup.ts (download soundfont), verify.ts (analyze the manifest)
 test/          vitest suites

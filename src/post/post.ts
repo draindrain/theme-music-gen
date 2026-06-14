@@ -144,25 +144,33 @@ export function encodeOgg(wavPath: string, oggPath: string): void {
 
 export interface FinalizeResult {
   wavPath: string;
-  oggPath: string;
+  /** Present only when OGG encoding was requested (the default). */
+  oggPath?: string;
   rmsDb: number;
   peakDb: number;
   seconds: number;
 }
 
-/** Loop-wrap (if loopSamples given), normalize, write WAV + OGG. */
+/**
+ * Loop-wrap (if loopSamples given), normalize, write WAV (always) and OGG
+ * (unless `ogg: false`). WAV is the canonical playback/analysis format, so it
+ * is always emitted; OGG is opt-out for back-compat and skippable when ffmpeg
+ * is absent or the caller doesn't want it.
+ */
 export function finalizeLoop(
   raw: AudioBuf,
   outBase: string,
-  opts: { loopSamples?: number; crossfadeSec?: number },
+  opts: { loopSamples?: number; crossfadeSec?: number; ogg?: boolean },
 ): FinalizeResult {
   let buf = raw;
   if (opts.loopSamples !== undefined) buf = wrapTailIntoLoop(buf, opts.loopSamples);
   else if (opts.crossfadeSec !== undefined) buf = crossfadeLoop(buf, opts.crossfadeSec);
   buf = normalizeLoudness(buf);
   const wavPath = `${outBase}.wav`;
-  const oggPath = `${outBase}.ogg`;
   writeWav(buf, wavPath);
+  const base = { wavPath, rmsDb: rmsDb(buf), peakDb: peakDb(buf), seconds: bufLength(buf) / buf.sampleRate };
+  if (opts.ogg === false) return base;
+  const oggPath = `${outBase}.ogg`;
   encodeOgg(wavPath, oggPath);
-  return { wavPath, oggPath, rmsDb: rmsDb(buf), peakDb: peakDb(buf), seconds: bufLength(buf) / buf.sampleRate };
+  return { ...base, oggPath };
 }

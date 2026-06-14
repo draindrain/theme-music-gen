@@ -6,7 +6,7 @@
  *   ambience <location.json> [--out dir]
  *   batch <assets-dir> [--backend name|all] [--out dir]
  *   preview --mix <music.wav> <ambience.wav> [--out file]
- *   serve [--out dir] [--fixtures dir] [--port n]
+ *   serve [--fixtures dir] [--jobs dir] [--port n]
  *   analyze <file.wav> [--key "C ionian"] [--bpm n]
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
@@ -22,7 +22,10 @@ import {
 import { characterPrompt, locationPrompt } from "../schema/prompt.ts";
 import { generateParams } from "../llm/generate.ts";
 import { catalogFor, MODEL_CATALOG } from "../llm/types.ts";
-import { DEFAULT_BACKEND, renderAmbienceAsset, renderMusicAsset } from "../pipeline.ts";
+import {
+  DEFAULT_BACKEND, renderAmbienceAsset, renderMusicAsset, renderSet,
+  RenderRequestError, type RenderItem,
+} from "../pipeline.ts";
 import { getBackend, listBackends } from "../synth/backend.ts";
 import { decodeWav } from "../audio/wav.ts";
 import { createBuf, bufLength } from "../audio/buffer.ts";
@@ -298,25 +301,32 @@ async function cmdBatch(args: Args): Promise<void> {
   if (characters.length === 0 && locations.length === 0)
     fail(`no fixtures found under ${assetsDir} (expected characters/*.json and locations/*.json)`);
 
+  // Build description+params items, then hand off to the shared core render loop
+  // (the same one the web `/api/generate` route uses).
+  const items: RenderItem[] = [
+    ...characters.map((p) => ({ description: parseDescription(readJson(p), p), params: loadCharacterParams(p) })),
+    ...locations.map((p) => ({ description: parseDescription(readJson(p), p), params: loadLocationParams(p) })),
+  ];
+
   const t0 = Date.now();
   let count = 0;
-  for (const charPath of characters) {
-    const params = loadCharacterParams(charPath);
-    for (const mood of MOODS) {
-      for (const backend of backends) {
-        const { asset } = await renderMusicAsset(params, mood, backend, outDir);
+  try {
+    const { manifest } = await renderSet(items, {
+      outDir,
+      backends,
+      onProgress: (asset) => {
         count++;
-        console.log(`[${count}] music    ${params.id}/${mood} (${backend})  ${asset.seconds.toFixed(1)}s  rms ${asset.rmsDb.toFixed(1)}dB`);
-      }
-    }
+        if (asset.type === "music")
+          console.log(`[${count}] music    ${asset.subject}/${asset.mood} (${asset.backend})  ${asset.seconds.toFixed(1)}s  rms ${asset.rmsDb.toFixed(1)}dB`);
+        else
+          console.log(`[${count}] ambience ${asset.location}  ${asset.seconds.toFixed(1)}s  rms ${asset.rmsDb.toFixed(1)}dB`);
+      },
+    });
+    console.log(`\ndone: ${manifest.assets.length} assets in ${((Date.now() - t0) / 1000).toFixed(1)}s -> ${resolve(outDir)}`);
+  } catch (e) {
+    if (e instanceof RenderRequestError) fail(e.message);
+    throw e;
   }
-  for (const locPath of locations) {
-    const params = loadLocationParams(locPath);
-    const { asset } = await renderAmbienceAsset(params, outDir);
-    count++;
-    console.log(`[${count}] ambience ${params.id}  ${asset.seconds.toFixed(1)}s  rms ${asset.rmsDb.toFixed(1)}dB`);
-  }
-  console.log(`\ndone: ${count} assets in ${((Date.now() - t0) / 1000).toFixed(1)}s -> ${resolve(outDir)}`);
 }
 
 async function cmdPreview(args: Args): Promise<void> {
@@ -370,10 +380,10 @@ async function cmdAnalyze(args: Args): Promise<void> {
 }
 
 async function cmdServe(args: Args): Promise<void> {
-  const outDir = String(args.flags.get("out") ?? "out");
   const fixturesDir = String(args.flags.get("fixtures") ?? "fixtures");
+  const jobsDir = String(args.flags.get("jobs") ?? "jobs");
   const port = Number(args.flags.get("port") ?? 4321);
-  await startServer({ outDir, fixturesDir, port });
+  await startServer({ fixturesDir, jobsDir, port });
 }
 
 async function main(): Promise<void> {
@@ -397,7 +407,7 @@ async function main(): Promise<void> {
           "  batch    <assets-dir> [--backend name|all] [--out dir]\n" +
           "  preview  --mix <music.wav> <ambience.wav>\n" +
           "  analyze  <file.wav> [--key 'C ionian'] [--bpm 96]\n" +
-          "  serve    [--out out] [--fixtures fixtures] [--port 4321]",
+          "  serve    [--fixtures fixtures] [--jobs jobs] [--port 4321]",
         );
         process.exit(cmd ? 1 : 0);
     }
