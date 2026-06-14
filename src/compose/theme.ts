@@ -8,6 +8,8 @@
 import type { CharacterParams, Contour, IntervalStyle, RhythmFeel } from "../schema/params.ts";
 import { Rng } from "../util/prng.ts";
 
+export type Episode = Theme;
+
 export interface Theme {
   /** scale degrees relative to tonic (0 = tonic), may exceed 0..6 */
   degrees: number[];
@@ -95,3 +97,63 @@ export function generateTheme(params: CharacterParams): Theme {
 }
 
 export const THEME_LENGTH_BEATS = THEME_BEATS;
+
+// ---------------------------------------------------------------------------
+// Episode generation — mood-specific 2-bar phrases derived from the core theme
+// ---------------------------------------------------------------------------
+
+/** Reverse the degree sequence, keep the rhythm pattern. */
+function retrograde(theme: Theme): Episode {
+  return {
+    degrees: [...theme.degrees].reverse(),
+    onsets: theme.onsets,
+    durations: theme.durations,
+  };
+}
+
+/** Mirror intervals around the opening note (up becomes down). */
+function inversion(theme: Theme): Episode {
+  const pivot = theme.degrees[0]!;
+  return {
+    degrees: theme.degrees.map((d) => Math.max(-4, Math.min(10, pivot - (d - pivot)))),
+    onsets: theme.onsets,
+    durations: theme.durations,
+  };
+}
+
+/** Swap adjacent note pairs in the degree sequence. */
+function permutation(theme: Theme): Episode {
+  const degrees = [...theme.degrees];
+  for (let i = 0; i + 1 < degrees.length; i += 2) {
+    const tmp = degrees[i]!;
+    degrees[i] = degrees[i + 1]!;
+    degrees[i + 1] = tmp;
+  }
+  return { degrees, onsets: theme.onsets, durations: theme.durations };
+}
+
+/** Take a prefix of notes, shift all degrees by a small interval. */
+function truncateShift(theme: Theme, rng: Rng): Episode {
+  const n = Math.max(3, Math.floor(theme.degrees.length * 0.6));
+  const shift = rng.pick([-2, -1, 1, 2] as const);
+  return {
+    degrees: theme.degrees.slice(0, n).map((d) => Math.max(-4, Math.min(10, d + shift))),
+    onsets: theme.onsets.slice(0, n),
+    durations: theme.durations.slice(0, n),
+  };
+}
+
+/**
+ * Generate a 2-bar episode derived from the core theme using one melodic
+ * transform chosen by the mood-forked RNG. Call once per mood; calling twice
+ * with the same rng produces two independent variants.
+ */
+export function generateEpisode(theme: Theme, rng: Rng): Episode {
+  const transform = rng.pick(["retrograde", "inversion", "permutation", "truncate"] as const);
+  switch (transform) {
+    case "retrograde": return retrograde(theme);
+    case "inversion": return inversion(theme);
+    case "permutation": return permutation(theme);
+    case "truncate": return truncateShift(theme, rng);
+  }
+}
