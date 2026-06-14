@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MODES, PITCH_CLASSES } from "../src/schema/params.ts";
 import {
   MODE_INTERVALS,
+  degreeClass,
   degreeToMidi,
   maxVoiceMovement,
   scalePitchClasses,
@@ -9,6 +10,12 @@ import {
   voiceLeadTriads,
 } from "../src/theory/theory.ts";
 import { MOOD_PROFILES } from "../src/compose/arrange.ts";
+
+describe("degreeClass", () => {
+  it("maps any integer degree to step 0..6 with true modulo", () => {
+    expect([-14, -7, -1, 0, 1, 6, 7, 8, 14].map(degreeClass)).toEqual([0, 0, 6, 0, 1, 6, 0, 1, 0]);
+  });
+});
 
 describe("scales", () => {
   it("every mode has 7 distinct intervals starting at 0", () => {

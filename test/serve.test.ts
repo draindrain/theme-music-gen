@@ -163,4 +163,15 @@ describe("web server", () => {
     const res = await post("/api/generate", { items: [], formats: ["wav"], backends: ["dsp"] });
     expect(res.status).toBe(400);
   });
+
+  it("returns a 400 with a clear message for a malformed JSON body", async () => {
+    const res = await fetch(`${base}/api/validate`, { method: "POST", body: "{not json" });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toContain("invalid JSON");
+  });
+
+  it("returns 404 for an unknown route", async () => {
+    const res = await fetch(`${base}/api/does-not-exist`);
+    expect(res.status).toBe(404);
+  });
 });
